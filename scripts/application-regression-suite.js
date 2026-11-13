@@ -76,6 +76,7 @@ const checks = [
   'document-module-isolation-test.js',
   'manual-report-email-test.js',
   'manual-report-request-test.js',
+  'compact-action-icon-test.js',
   'resend-email-queue-test.js',
   'resend-transport-test.js',
   'release-resend-verification-test.js',

@@ -8,6 +8,8 @@ const BUSINESS_HUB_CONTENT_CSS = '/business-hub-content.css?v=20261029-content';
 const BUSINESS_HUB_JS = '/business-hub-shell.js?v=20261028-shell';
 const DOCUMENT_EMAIL_CSS = '/document-email.css?v=20261112';
 const DOCUMENT_EMAIL_JS = '/document-email.js?v=20261112';
+const ACTION_ICONS_CSS = '/action-icons.css?v=20261113';
+const ACTION_ICONS_JS = '/action-icons.js?v=20261113';
 const CANONICAL_LOGO = '/logo.png';
 
 function canonicalizeLogoPaths(html) {
@@ -62,6 +64,8 @@ function injectGlobalBrand(html) {
     '<script src="/operations-ui.js" defer></script>\n</head>');
   if(!rendered.includes('/document-email.js'))rendered=rendered.replace(/<\/head>/i,
     `<link rel="stylesheet" href="${DOCUMENT_EMAIL_CSS}"><script src="${DOCUMENT_EMAIL_JS}" defer></script>\n</head>`);
+  if(!rendered.includes('/action-icons.js'))rendered=rendered.replace(/<\/head>/i,
+    `<link rel="stylesheet" href="${ACTION_ICONS_CSS}"><script src="${ACTION_ICONS_JS}" defer></script>\n</head>`);
   // Keep the shared presentation last, after retained role/module styles. It
   // never rewrites permissions, chart configuration or business navigation.
   if (!rendered.includes(BUSINESS_HUB_CONTENT_CSS)) rendered = rendered.replace(/<\/head>/i,
@@ -73,4 +77,4 @@ function injectGlobalBrand(html) {
   return rendered;
 }
 
-module.exports = { BRAND_CSS, BRAND_JS, WORKSPACE_CSS, BUSINESS_HUB_CSS, BUSINESS_HUB_CONTENT_CSS, BUSINESS_HUB_JS, DOCUMENT_EMAIL_CSS, DOCUMENT_EMAIL_JS, CANONICAL_LOGO, canonicalizeLogoPaths, injectGlobalBrand };
+module.exports = { BRAND_CSS, BRAND_JS, WORKSPACE_CSS, BUSINESS_HUB_CSS, BUSINESS_HUB_CONTENT_CSS, BUSINESS_HUB_JS, DOCUMENT_EMAIL_CSS, DOCUMENT_EMAIL_JS, ACTION_ICONS_CSS, ACTION_ICONS_JS, CANONICAL_LOGO, canonicalizeLogoPaths, injectGlobalBrand };

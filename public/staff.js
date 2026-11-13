@@ -190,7 +190,7 @@ function staffExternalHttpLink(value, label) {
   try {
     const url = new URL(raw);
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return '';
-    return `<a class="secondary-btn inline-action" href="${escapeHtml(url.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
+    return `<a class="secondary-btn inline-action" data-vv-action-icon="link" href="${escapeHtml(url.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
   } catch {
     return '';
   }
@@ -546,10 +546,10 @@ async function loadStaffRfqs() {
         <td><strong>${escapeHtml(rfq.material || '-')}</strong><br><span class="muted-text">${escapeHtml(rfq.application || '-')}</span></td>
         <td>${escapeHtml(rfq.quantity || 0)}</td>
         <td>${staffStatusBadge(rfq.status)}</td>
-        <td class="${inputAllowed ? '' : 'hidden-section'}">
-          <button class="icon-btn" type="button" onclick="return updateStaffRfqStatus(${Number(rfq.id)}, 'approve')">Approve</button>
-          <button class="icon-btn danger-icon" type="button" onclick="return updateStaffRfqStatus(${Number(rfq.id)}, 'reject')">Reject</button>
-        </td>
+        <td class="${inputAllowed ? '' : 'hidden-section'}"><div class="vv-action-toolbar">
+          <button class="icon-btn" data-vv-action-icon="approve" type="button" onclick="return updateStaffRfqStatus(${Number(rfq.id)}, 'approve')">Approve</button>
+          <button class="icon-btn danger-icon" data-vv-action-icon="reject" type="button" onclick="return updateStaffRfqStatus(${Number(rfq.id)}, 'reject')">Reject</button>
+        </div></td>
       </tr>
     `).join('');
   } catch {
@@ -632,7 +632,7 @@ async function loadStaffInvoices() {
         <td>${escapeHtml(formatMoney(invoice.paid_amount))}</td>
         <td>${escapeHtml(formatMoney(invoice.balance_due))}</td>
         <td>${staffStatusBadge(invoice.payment_state || invoice.status)}</td>
-        <td><button class="icon-btn" type="button" onclick="return openStaffInvoicePdf(${Number(invoice.id)})">PDF</button></td>
+        <td><button class="icon-btn" data-vv-action-icon="pdf" type="button" onclick="return openStaffInvoicePdf(${Number(invoice.id)})">PDF</button></td>
       </tr>
     `).join('');
   } catch {
@@ -982,7 +982,7 @@ function staffTimesheetRow(row){
 function renderGroupedTimesheets(container,groups,type){
  if(!container)return;
  if(!groups.length){container.innerHTML=`<div class="empty-state">Your ${type} timesheet history will appear here after your first shift.</div>`;return;}
- container.innerHTML=groups.map(group=>`<section class="timesheet-group"><div class="timesheet-group-head"><div><h3>${escapeHtml(type==='monthly'?group.label:'Week: '+group.label)}</h3><p>${escapeHtml(type==='monthly'?group.range:group.label)} · ${escapeHtml(staffTimesheetTimezone||'Workplace timezone unavailable')}</p>${group.reviewCount?`<p>${group.reviewCount} source ${group.reviewCount===1?'session needs':'sessions need'} review. Unverified work is excluded.</p>`:''}</div><div class="timesheet-total">${group.totalHours===null?'Verification unavailable':escapeHtml(group.totalHours.toFixed(2))+' verified hrs'}</div>${type==='weekly'&&group.start?`<button type="button" class="secondary-btn" data-staff-week="${escapeHtml(group.start)}">Open week</button>`:''}</div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Clock in</th><th>Clock out</th><th>Recorded break</th><th>Verified work</th><th>Source status</th><th>Notes</th></tr></thead><tbody>${group.rows.map(staffTimesheetRow).join('')}</tbody></table></div></section>`).join('');
+ container.innerHTML=groups.map(group=>`<section class="timesheet-group"><div class="timesheet-group-head"><div><h3>${escapeHtml(type==='monthly'?group.label:'Week: '+group.label)}</h3><p>${escapeHtml(type==='monthly'?group.range:group.label)} · ${escapeHtml(staffTimesheetTimezone||'Workplace timezone unavailable')}</p>${group.reviewCount?`<p>${group.reviewCount} source ${group.reviewCount===1?'session needs':'sessions need'} review. Unverified work is excluded.</p>`:''}</div><div class="timesheet-total">${group.totalHours===null?'Verification unavailable':escapeHtml(group.totalHours.toFixed(2))+' verified hrs'}</div>${type==='weekly'&&group.start?`<button type="button" class="secondary-btn" data-vv-action-icon="calendar" data-staff-week="${escapeHtml(group.start)}">Open week</button>`:''}</div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Clock in</th><th>Clock out</th><th>Recorded break</th><th>Verified work</th><th>Source status</th><th>Notes</th></tr></thead><tbody>${group.rows.map(staffTimesheetRow).join('')}</tbody></table></div></section>`).join('');
  container.querySelectorAll('[data-staff-week]').forEach(button=>button.onclick=()=>selectStaffTimesheetWeek(button.dataset.staffWeek));
 }
 let selectedStaffTimesheetWeek='',staffTimesheetSelectionEpoch=0;
@@ -1786,15 +1786,15 @@ function buildTaskCard(task) {
 
   if (status !== 'done') {
     actions += `
-      <button class="secondary-btn" onclick="return updateMyTaskStatus(${Number(task.id)}, 'in_progress')">
+      <button class="secondary-btn" data-vv-action-icon="start" onclick="return updateMyTaskStatus(${Number(task.id)}, 'in_progress')">
         Start / In Progress
       </button>
 
-      <button class="primary-btn" onclick="return updateMyTaskStatus(${Number(task.id)}, 'done')">
+      <button class="primary-btn" data-vv-action-icon="complete" onclick="return updateMyTaskStatus(${Number(task.id)}, 'done')">
         Mark Done
       </button>
 
-      <button class="secondary-btn" onclick="return updateMyTaskStatus(${Number(task.id)}, 'pending')">
+      <button class="secondary-btn" data-vv-action-icon="restore" onclick="return updateMyTaskStatus(${Number(task.id)}, 'pending')">
         Not Complete
       </button>
     `;
@@ -1810,7 +1810,7 @@ function buildTaskCard(task) {
       <p><strong>Due Date:</strong> ${escapeHtml(due)}</p>
       <span class="${taskBadgeClass(status)}">${escapeHtml(status)}</span>
 
-      <div class="card-actions">
+      <div class="card-actions vv-action-toolbar">
         ${actions}
       </div>
     </div>
@@ -1992,11 +1992,11 @@ async function loadStaffStock() {
         <strong>Created: ${escapeHtml(item.created_by_name || '-')}</strong><br>
         <span>Updated: ${escapeHtml(item.updated_by_name || '-')}</span>
       </td>
-      <td>
-        ${canEditStockIn ? `<button class="icon-btn" onclick="return openStaffStockDialog(${Number(item.id)})">Edit</button>` : ''}
-        ${canIssueStock ? `<button class="icon-btn" onclick="return openStaffStockOutDialog(${Number(item.id)})">Out</button>` : ''}
+      <td><div class="vv-action-toolbar">
+        ${canEditStockIn ? `<button class="icon-btn" data-vv-action-icon="edit" onclick="return openStaffStockDialog(${Number(item.id)})">Edit</button>` : ''}
+        ${canIssueStock ? `<button class="icon-btn" data-vv-action-icon="issue" onclick="return openStaffStockOutDialog(${Number(item.id)})">Out</button>` : ''}
         ${!canEditStockIn && !canIssueStock ? '<span class="muted-text">View only</span>' : ''}
-      </td>
+      </div></td>
     </tr>
   `).join('');
 }
@@ -2112,11 +2112,11 @@ async function loadStaffStockOut() {
       <td>${escapeHtml(item.issued_to || '-')}</td>
       <td>${escapeHtml(item.notes || '-')}</td>
       <td>${escapeHtml(item.created_by_name || '-')}</td>
-      <td>
-        ${canEditStockOut ? `<button class="icon-btn" onclick="return openStaffStockOutById(${Number(item.id)})">Edit</button>` : ''}
-        ${canEditStockOut ? `<button class="icon-btn danger-icon" onclick="return deleteStaffStockOut(${Number(item.id)})">Delete</button>` : ''}
+      <td><div class="vv-action-toolbar">
+        ${canEditStockOut ? `<button class="icon-btn" data-vv-action-icon="edit" onclick="return openStaffStockOutById(${Number(item.id)})">Edit</button>` : ''}
+        ${canEditStockOut ? `<button class="icon-btn danger-icon" data-vv-action-icon="delete" onclick="return deleteStaffStockOut(${Number(item.id)})">Delete</button>` : ''}
         ${!canEditStockOut ? '<span class="muted-text">View only</span>' : ''}
-      </td>
+      </div></td>
     </tr>
   `).join('');
 }
@@ -2904,7 +2904,7 @@ function renderStaffAvailability() {
   renderStaffModuleList('staffAvailabilityList', rows, 'No availability records yet.', (row) => `
     <article class="staff-mini-card">
       <div><strong>${escapeHtml(row.date)}</strong><span>${escapeHtml(row.status)}</span><small>${escapeHtml(row.notes || 'No notes')}</small></div>
-      <button type="button" class="secondary-btn compact-btn" onclick="return deleteStaffWorkRecord('availability', ${Number(row.id)}, renderStaffAvailability)">Delete</button>
+      <button type="button" class="secondary-btn compact-btn" data-vv-action-icon="delete" onclick="return deleteStaffWorkRecord('availability', ${Number(row.id)}, renderStaffAvailability)">Delete</button>
     </article>
   `);
 }
@@ -2921,7 +2921,8 @@ function renderStaffDocuments() {
         <span>${escapeHtml(doc.category)}</span>
         <h3>${escapeHtml(doc.title)}</h3>
         <p>${escapeHtml(doc.summary)}</p>
-        <button class="${read ? 'secondary-btn' : 'primary-btn'}" type="button" onclick="return markStaffDocumentRead(${escapeHtml(JSON.stringify(doc.id))})">${read ? 'Read Confirmed' : 'Mark Read'}</button>
+        ${read ? '<span class="staff-status-pill">Read confirmed</span>' : ''}
+        <button class="${read ? 'secondary-btn' : 'primary-btn'}" type="button" data-vv-action-icon="complete" onclick="return markStaffDocumentRead(${escapeHtml(JSON.stringify(doc.id))})">${read ? 'Read Confirmed' : 'Mark Read'}</button>
       </article>`;
   }).join('');
 }
@@ -2961,7 +2962,7 @@ function renderStaffFormSubmissions() {
   renderStaffModuleList('staffFormList', rows, 'No form submissions yet.', (row) => `
     <article class="staff-mini-card">
       <div><strong>${escapeHtml(row.type)}</strong><span>${escapeHtml(row.result)}</span><small>${escapeHtml(new Date(row.submitted_at).toLocaleString())}</small><small>${escapeHtml(row.notes || '')}</small></div>
-      <button type="button" class="secondary-btn compact-btn" onclick="return deleteStaffWorkRecord('forms', ${Number(row.id)}, renderStaffFormSubmissions)">Delete</button>
+      <button type="button" class="secondary-btn compact-btn" data-vv-action-icon="delete" onclick="return deleteStaffWorkRecord('forms', ${Number(row.id)}, renderStaffFormSubmissions)">Delete</button>
     </article>
   `);
 }
@@ -3070,7 +3071,7 @@ function renderStaffTrash() {
       </div>
       <div class="staff-trash-item-action">
         <span class="trash-module-chip">Recoverable archive</span>
-        <button class="primary-btn compact-btn" type="button" onclick="return restoreStaffTrashItem(${Number(item.id)})">Restore</button>
+        <button class="primary-btn compact-btn" data-vv-action-icon="restore" type="button" onclick="return restoreStaffTrashItem(${Number(item.id)})">Restore</button>
       </div>
     </article>
   `).join('');

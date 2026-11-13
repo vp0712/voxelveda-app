@@ -55,12 +55,13 @@
         <td><strong>${escapeHtml(formatMoney(expense.balance_due))}</strong></td>
         <td>${statusBadge(expense.status)}</td>
         <td>${Number(expense.file_count || 0) ? `<button class="file-badge-btn" onclick="openExpenseFileDialog(${expense.id})">${escapeHtml(expense.file_count)} bill${Number(expense.file_count) === 1 ? '' : 's'} attached</button>` : '<span class="muted-text">No bill</span>'}</td>
-        <td>
-          ${Number(expense.balance_due || 0) > 0 ? `<button class="icon-btn" onclick="openRecordExpensePaymentDialog(${expense.id})">Pay</button>` : ''}
-          <button class="icon-btn" onclick="openExpensePaymentHistory(${expense.id})">Payments</button>
-          <button class="icon-btn" onclick="openExpenseDialog(${expense.id})">Edit</button>
-          <button class="icon-btn" onclick="openExpenseFileDialog(${expense.id})">Bill</button>
-          <button class="icon-btn danger-icon" onclick="deleteExpense(${expense.id})">Delete</button>
+        <td><div class="vv-action-toolbar">
+          ${Number(expense.balance_due || 0) > 0 ? `<button class="icon-btn" data-vv-action-icon="payment" title="Record expense payment" onclick="openRecordExpensePaymentDialog(${expense.id})">Pay</button>` : ''}
+          <button class="icon-btn" data-vv-action-icon="history" title="View expense payment history" onclick="openExpensePaymentHistory(${expense.id})">Payments</button>
+          <button class="icon-btn" data-vv-action-icon="edit" title="Edit expense" onclick="openExpenseDialog(${expense.id})">Edit</button>
+          <button class="icon-btn" data-vv-action-icon="document" title="View expense bill" onclick="openExpenseFileDialog(${expense.id})">Bill</button>
+          <button class="icon-btn danger-icon" data-vv-action-icon="delete" title="Delete expense" onclick="deleteExpense(${expense.id})">Delete</button>
+          </div>
         </td>
       </tr>`).join('');
   };
@@ -203,7 +204,7 @@
     const res = await fetch(`/api/expenses/${Number(id)}/payments`, { headers: { Authorization: `Bearer ${token}` } });
     const data = await safeJson(res);
     if (!res.ok) return showToast(data.message || 'Payment history could not be loaded', {kind:'error'});
-    const rows = (data.payments || []).map((payment) => `<tr class="${payment.voided_at ? 'muted-text' : ''}"><td>${escapeHtml(formatDate(payment.payment_date))}</td><td>${escapeHtml(formatMoney(payment.amount))}</td><td>${escapeHtml(payment.payment_method || '-')}</td><td>${escapeHtml(payment.account_name || '-')}</td><td>${escapeHtml(payment.reference || '-')}</td><td>${payment.voided_at ? `Reversed: ${escapeHtml(payment.void_reason || '')}` : `<button class="mini-danger" onclick="voidExpensePayment(${Number(payment.id)}, ${Number(id)})">Reverse</button>`}</td></tr>`).join('') || '<tr><td colspan="6">No payments recorded.</td></tr>';
+    const rows = (data.payments || []).map((payment) => `<tr class="${payment.voided_at ? 'muted-text' : ''}"><td>${escapeHtml(formatDate(payment.payment_date))}</td><td>${escapeHtml(formatMoney(payment.amount))}</td><td>${escapeHtml(payment.payment_method || '-')}</td><td>${escapeHtml(payment.account_name || '-')}</td><td>${escapeHtml(payment.reference || '-')}</td><td>${payment.voided_at ? `Reversed: ${escapeHtml(payment.void_reason || '')}` : `<button class="mini-danger" data-vv-action-icon="revision" title="Reverse expense payment" onclick="voidExpensePayment(${Number(payment.id)}, ${Number(id)})">Reverse</button>`}</td></tr>`).join('') || '<tr><td colspan="6">No payments recorded.</td></tr>';
     showDialog('Expense Payment History', `<div class="expense-summary-strip"><div><span>ORIGINAL</span><strong>${escapeHtml(formatMoney(data.expense.total_amount))}</strong></div><div><span>PAID</span><strong>${escapeHtml(formatMoney(data.expense.total_paid))}</strong></div><div><span>BALANCE</span><strong>${escapeHtml(formatMoney(data.expense.balance_due))}</strong></div></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Account</th><th>Reference</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`, hideDialog, 'Close');
     document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
   };

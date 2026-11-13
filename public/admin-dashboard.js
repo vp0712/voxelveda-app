@@ -1099,11 +1099,11 @@ function renderCompanyForms() {
             <h4>${escapeHtml(form.title)}</h4>
             <p>${escapeHtml(form.note)}</p>
             ${form.digital === false ? '<div class="form-record-line">Printable master template</div>' : `<div class="form-record-line">${savedCount} digital record${savedCount === 1 ? '' : 's'} saved</div>`}
-            <div class="dialog-actions inline-actions form-action-stack">
-              ${form.digital === false ? '' : `<button class="primary-btn" onclick="return openCompanyFormFiller(${inlineArgument(formKey)})">Fill Digitally</button>
-              <button class="icon-btn" onclick="return openCompanyFormEntries(${inlineArgument(formKey)})">Entries</button>`}
-              <a class="icon-btn" href="${escapeHtml(safeDocumentHref(fileUrl))}" target="_blank" rel="noopener noreferrer">Preview PDF</a>
-              <a class="icon-btn" href="${escapeHtml(downloadUrl)}" download>Download Blank PDF</a>
+            <div class="dialog-actions inline-actions form-action-stack vv-action-toolbar">
+              ${form.digital === false ? '' : `<button data-vv-action-icon="edit" class="primary-btn" onclick="return openCompanyFormFiller(${inlineArgument(formKey)})">Fill Digitally</button>
+              <button data-vv-action-icon="history" class="icon-btn" onclick="return openCompanyFormEntries(${inlineArgument(formKey)})">Entries</button>`}
+              <a data-vv-action-icon="pdf" class="icon-btn" href="${escapeHtml(safeDocumentHref(fileUrl))}" target="_blank" rel="noopener noreferrer">Preview PDF</a>
+              <a data-vv-action-icon="download" class="icon-btn" href="${escapeHtml(downloadUrl)}" download>Download Blank PDF</a>
             </div>
           </article>
         `}).join('')}
@@ -1353,10 +1353,10 @@ function openCompanyFormEntries(formKey) {
               <strong>${escapeHtml(titleValue)}</strong>
               <span>${escapeHtml(record.formTitle)} • ${new Date(record.updatedAt).toLocaleString()}</span>
             </div>
-            <div class="inline-actions">
-              <button class="icon-btn" onclick="return previewCompanyFormRecord(${inlineArgument(record.id)})">Preview</button>
-              <button class="primary-btn" onclick="return openCompanyFormFiller(${inlineArgument(formKey)}, ${inlineArgument(record.id)})">Edit</button>
-              ${record.archived ? `<button class="secondary-btn" onclick="return restoreCompanyFormRecord(${inlineArgument(record.id)},${inlineArgument(formKey)})">Restore</button>` : `<button class="secondary-btn" onclick="return deleteCompanyFormRecord(${inlineArgument(record.id)},${inlineArgument(formKey)})">Archive</button>`}
+            <div class="inline-actions vv-action-toolbar">
+              <button data-vv-action-icon="view" class="icon-btn" onclick="return previewCompanyFormRecord(${inlineArgument(record.id)})">Preview</button>
+              <button data-vv-action-icon="edit" class="primary-btn" onclick="return openCompanyFormFiller(${inlineArgument(formKey)}, ${inlineArgument(record.id)})">Edit</button>
+              ${record.archived ? `<button data-vv-action-icon="restore" class="secondary-btn" onclick="return restoreCompanyFormRecord(${inlineArgument(record.id)},${inlineArgument(formKey)})">Restore</button>` : `<button data-vv-action-icon="archive" class="secondary-btn" onclick="return deleteCompanyFormRecord(${inlineArgument(record.id)},${inlineArgument(formKey)})">Archive</button>`}
             </div>
           </div>
         `;
@@ -1410,7 +1410,7 @@ function renderTrash() {
         <td>${escapeHtml(formatDateTime(item.deleted_at))}</td>
         <td><strong>Recoverable archive</strong>${Number(item.retention_hold) ? `<small class="table-subline">${escapeHtml(item.retention_hold_reason || 'Retention hold')}</small>` : ''}</td>
         <td>${escapeHtml(item.delete_reason || 'No reason recorded')}</td>
-        <td><div class="row-actions"><button type="button" class="secondary-btn" onclick="return restoreTrash(${inlineArgument(item.id)})">Restore</button></div></td>
+        <td><div class="row-actions vv-action-toolbar"><button data-vv-action-icon="restore" type="button" class="secondary-btn" onclick="return restoreTrash(${inlineArgument(item.id)})">Restore</button></div></td>
       </tr>
     `).join('');
   }
@@ -1776,7 +1776,7 @@ function renderLastOrders(invoices) {
       <td>${escapeHtml(formatDate(invoice.created_at))}</td>
       <td>${escapeHtml(invoice.customer_name || '-')}</td>
       <td>${escapeHtml(formatMoney(invoice.total))}</td>
-      <td><button class="icon-btn" onclick="return openInvoicePdf(${invoice.id})">View</button></td>
+      <td><div class="vv-action-toolbar"><button data-vv-action-icon="pdf" class="icon-btn" onclick="return openInvoicePdf(${invoice.id})">View</button></div></td>
     </tr>
   `).join('');
 }
@@ -2151,16 +2151,16 @@ async function loadRFQs() {
         <td>${escapeHtml(r.material || '-')}</td>
         <td>${escapeHtml(r.quantity || 0)}</td>
         <td>${statusBadge(status)}</td>
-        <td class="register-action-cell">
-          <button class="secondary-btn" onclick="return viewOriginalRfq(${Number(r.id)})">View &amp; History</button>
-          ${canEdit && ['pending','rejected'].includes(status) ? `<button class="secondary-btn" onclick="return editOriginalRfq(${Number(r.id)})">Edit</button>` : ''}
-          ${canEdit && ['pending','rejected'].includes(status) ? `<button class="small-btn" onclick="return updateRFQ(${Number(r.id)}, 'approve')">Approve</button>` : ''}
-          ${canEdit && ['pending','approved'].includes(status) ? `<button class="secondary-btn" onclick="return updateRFQ(${Number(r.id)}, 'reject')">Reject</button>` : ''}
-          ${canInvoice ? `<button class="small-btn" onclick="return createInvoiceFromRFQ(${r.id})">${status === 'quoted' ? 'Open Invoice' : 'Invoice'}</button>` : ''}
-          ${canEdit && !['closed'].includes(status) ? `<button class="secondary-btn" onclick="return updateRFQ(${Number(r.id)}, 'close')">Close RFQ</button>` : ''}
-          ${canEdit && ['pending','rejected','closed'].includes(status) ? `<button class="secondary-btn" onclick="return archiveOriginalRfq(${Number(r.id)},false)">Archive</button>` : ''}
-          ${archived && hasCurrentPermission('rfqs_input') ? `<button class="secondary-btn" onclick="return archiveOriginalRfq(${Number(r.id)},true)">Restore</button>` : ''}
-        </td>
+        <td class="register-action-cell"><div class="vv-action-toolbar">
+          <button data-vv-action-icon="view" class="secondary-btn" onclick="return viewOriginalRfq(${Number(r.id)})">View &amp; History</button>
+          ${canEdit && ['pending','rejected'].includes(status) ? `<button data-vv-action-icon="edit" class="secondary-btn" onclick="return editOriginalRfq(${Number(r.id)})">Edit</button>` : ''}
+          ${canEdit && ['pending','rejected'].includes(status) ? `<button data-vv-action-icon="approve" class="small-btn" onclick="return updateRFQ(${Number(r.id)}, 'approve')">Approve</button>` : ''}
+          ${canEdit && ['pending','approved'].includes(status) ? `<button data-vv-action-icon="reject" class="secondary-btn" onclick="return updateRFQ(${Number(r.id)}, 'reject')">Reject</button>` : ''}
+          ${canInvoice ? `<button data-vv-action-icon="document" class="small-btn" onclick="return createInvoiceFromRFQ(${r.id})">${status === 'quoted' ? 'Open Invoice' : 'Invoice'}</button>` : ''}
+          ${canEdit && !['closed'].includes(status) ? `<button data-vv-action-icon="complete" class="secondary-btn" onclick="return updateRFQ(${Number(r.id)}, 'close')">Close RFQ</button>` : ''}
+          ${canEdit && ['pending','rejected','closed'].includes(status) ? `<button data-vv-action-icon="archive" class="secondary-btn" onclick="return archiveOriginalRfq(${Number(r.id)},false)">Archive</button>` : ''}
+          ${archived && hasCurrentPermission('rfqs_input') ? `<button data-vv-action-icon="restore" class="secondary-btn" onclick="return archiveOriginalRfq(${Number(r.id)},true)">Restore</button>` : ''}
+        </div></td>
       </tr>
     `;
     }
@@ -2345,7 +2345,7 @@ function invoiceItemRows(items = [{ description: '', quantity: 1, unit_price: 0 
         <span>Unit price</span>
         <input class="invoiceItemPrice" type="number" min="0" step="0.01" placeholder="Unit price" required value="${escapeHtml(item.unit_price ?? '')}" oninput="updateManualInvoiceSummary()" />
       </label>
-      <button type="button" class="secondary-btn invoice-remove-btn" onclick="return removeInvoiceItemRow(this)">Remove</button>
+      <button data-vv-action-icon="delete" type="button" class="secondary-btn invoice-remove-btn" onclick="return removeInvoiceItemRow(this)">Remove</button>
     </div>
   `).join('');
 }
@@ -2591,7 +2591,7 @@ function openManualInvoiceDialog() {
         <div class="dialog-card">
           <h4>Line Items</h4>
           <div id="invoiceItemsContainer">${invoiceItemRows()}</div>
-          <button type="button" class="secondary-btn" onclick="return addInvoiceItemRow()">Add Item</button>
+          <button data-vv-action-icon="add" type="button" class="secondary-btn" onclick="return addInvoiceItemRow()">Add Item</button>
           <div class="manual-invoice-summary">
             <div><span>Subtotal</span><strong id="manualInvoiceSubtotal">$0.00</strong></div>
             <div><span id="manualInvoiceGstSummaryLabel">GST (10%)</span><strong id="manualInvoiceGstAmount">$0.00</strong></div>
@@ -2683,13 +2683,13 @@ function invoiceMoney(value){return value===null||value===undefined||value===''|
 function invoiceActions(invoice){
   const id=Number(invoice.id),status=String(invoice.status||''),archived=Number(invoice.deleted)===1;
   const pendingKey='voxelveda:invoice-payment:'+currentUser?.id+':'+id;let pendingReceipt=false;try{pendingReceipt=Boolean(sessionStorage.getItem(pendingKey));}catch{};
-  if(archived)return hasCurrentPermission('VOID_TRANSACTION')?`<button type="button" class="secondary-btn" onclick="invoiceAction(${id},'restore')">Restore</button>`:'';
-  return `${pendingReceipt?`<button class="secondary-btn" onclick="openInvoicePaymentDialog(${id})">Check payment request</button>`:''}${hasCurrentPermission('POST_TRANSACTION')&&['draft','rejected'].includes(status)?`<button class="secondary-btn" onclick="invoiceAction(${id},'approve')">Approve</button>`:''}
-  ${hasCurrentPermission('EDIT_FINANCE')&&hasCurrentPermission('SEND_COMPANY_EMAIL')&&['approved','sent','paid'].includes(status)?`<button type="button" class="secondary-btn vv-document-email-button" aria-label="Email this invoice" onclick="return openSendInvoiceDialog(${id})">${window.VoxelDocumentEmail?.icon || ''}<span>Email</span></button>`:''}
-  ${!invoice.payment_review_required&&hasCurrentPermission('POST_TRANSACTION')&&['approved','sent'].includes(status)&&Number(invoice.balance_due)>0?`<button class="secondary-btn" onclick="openInvoicePaymentDialog(${id})">Record payment</button>`:''}
-  ${hasCurrentPermission('EDIT_FINANCE')&&['draft','rejected','approved'].includes(status)?`<button class="secondary-btn" onclick="openEditInvoiceDialog(${id})">Edit</button>`:''}
-  <button class="secondary-btn" onclick="openInvoiceQrDialog(${id})">Invoice link QR</button>
-  ${hasCurrentPermission('VOID_TRANSACTION')?`<button class="danger-btn" onclick="invoiceAction(${id},'delete')">Archive</button>`:''}`;
+  if(archived)return hasCurrentPermission('VOID_TRANSACTION')?`<button data-vv-action-icon="restore" type="button" class="secondary-btn" onclick="invoiceAction(${id},'restore')">Restore</button>`:'';
+  return `${pendingReceipt?`<button data-vv-action-icon="payment" class="secondary-btn" onclick="openInvoicePaymentDialog(${id})">Check payment request</button>`:''}${hasCurrentPermission('POST_TRANSACTION')&&['draft','rejected'].includes(status)?`<button data-vv-action-icon="approve" class="secondary-btn" onclick="invoiceAction(${id},'approve')">Approve</button>`:''}
+  ${hasCurrentPermission('EDIT_FINANCE')&&hasCurrentPermission('SEND_COMPANY_EMAIL')&&['approved','sent','paid'].includes(status)?`<button data-vv-action-icon="email" type="button" class="secondary-btn vv-document-email-button" aria-label="Email this invoice" onclick="return openSendInvoiceDialog(${id})">${window.VoxelDocumentEmail?.icon || ''}<span>Email</span></button>`:''}
+  ${!invoice.payment_review_required&&hasCurrentPermission('POST_TRANSACTION')&&['approved','sent'].includes(status)&&Number(invoice.balance_due)>0?`<button data-vv-action-icon="payment" class="secondary-btn" onclick="openInvoicePaymentDialog(${id})">Record payment</button>`:''}
+  ${hasCurrentPermission('EDIT_FINANCE')&&['draft','rejected','approved'].includes(status)?`<button data-vv-action-icon="edit" class="secondary-btn" onclick="openEditInvoiceDialog(${id})">Edit</button>`:''}
+  <button data-vv-action-icon="qr" class="secondary-btn" onclick="openInvoiceQrDialog(${id})">Invoice link QR</button>
+  ${hasCurrentPermission('VOID_TRANSACTION')?`<button data-vv-action-icon="archive" class="danger-btn" onclick="invoiceAction(${id},'delete')">Archive</button>`:''}`;
 }
 async function loadInvoices() {
  const tbody=document.getElementById('invoiceTableBody');if(!tbody)return;
@@ -2705,12 +2705,12 @@ async function loadInvoices() {
   renderRegisterPage({key:'invoices',tbody,rows:invoiceCache,colspan:10,emptyMessage:'No invoices match these filters.',onChange:loadInvoices,remoteMeta:{total:Number(data.total)},rowRenderer:invoice=>`<tr data-invoice-id="${Number(invoice.id)}">
    <td class="invoice-number">${Number(invoice.id)}</td><td class="invoice-reference"><strong>${escapeHtml(invoice.invoice_no||'Reference not available')}</strong></td><td class="invoice-customer">${escapeHtml(invoice.customer_name||'Customer not available')}</td><td class="invoice-rfq">${invoice.rfq_id?`<button class="icon-btn" onclick="openRecordRegister('rfqs',{search:String(${Number(invoice.rfq_id)})})">RFQ #${Number(invoice.rfq_id)}</button>`:'Manual'}</td><td class="invoice-date">${escapeHtml(String(invoice.created_at||'Date not available').slice(0,10))}</td>
    <td class="invoice-amount">${escapeHtml(invoiceMoney(invoice.total))}</td><td class="invoice-amount">${escapeHtml(invoiceMoney(invoice.paid_amount))}</td><td class="invoice-amount">${escapeHtml(invoiceMoney(invoice.balance_due))}</td><td class="invoice-status">${statusBadge(Number(invoice.deleted)===1?'archived':invoice.status||'unknown')}${invoice.payment_review_required?'<span class="invoice-review-label">Payment details require review</span>':''}</td>
-   <td class="register-action-cell invoice-action-cell"><div class="invoice-actions"><button class="primary-btn" onclick="openInvoiceDetail(${Number(invoice.id)})">View invoice</button>${Number(invoice.deleted)!==1?`<button class="secondary-btn" onclick="openInvoicePdf(${Number(invoice.id)})">PDF</button>`:''}<details class="record-action-menu"><summary>More</summary><div>${invoiceActions(invoice)}</div></details></div></td></tr>`});
+   <td class="register-action-cell invoice-action-cell"><div class="invoice-actions vv-action-toolbar"><button data-vv-action-icon="view" class="primary-btn" onclick="openInvoiceDetail(${Number(invoice.id)})">View invoice</button>${Number(invoice.deleted)!==1?`<button data-vv-action-icon="pdf" class="secondary-btn" onclick="openInvoicePdf(${Number(invoice.id)})">PDF</button>`:''}${invoiceActions(invoice)}</div></td></tr>`});
   const sum=data.summary;
   updateInvoiceMetrics(invoiceCache,sum);
   const controls=document.querySelector('[data-register-controls="invoices"]');let note=controls.querySelector('.register-filter-note');if(!note){note=document.createElement('p');note.className='register-filter-note';controls.append(note);}note.textContent=`Totals cover all ${Number(data.total)} matching records. ${query.get('search')||query.get('status')||state.archived?'Filters active.':'No active filters.'}`;
   if(hasCurrentPermission('VOID_TRANSACTION')&&!controls.querySelector('[data-invoice-archive]')){const label=document.createElement('label');label.innerHTML='Records <select data-invoice-archive><option value="">Active</option><option value="archived">Archived</option></select>';controls.querySelector('.register-search-controls').append(label);label.querySelector('select').onchange=event=>{registerPagerState.invoices={...registerPagerState.invoices,page:1,archived:event.target.value==='archived'};loadInvoices();};}
- }catch(error){if(sequence!==invoiceLoadSequence)return;tbody.innerHTML=`<tr><td colspan="10"><p role="alert">${escapeHtml(error.message)}</p><button class="secondary-btn" onclick="loadInvoices()">Retry invoices</button></td></tr>`;['invoiceTotalValue','invoiceUnpaidValue','invoiceSentPaidCount'].forEach(id=>setText(id,'Not available'));}
+ }catch(error){if(sequence!==invoiceLoadSequence)return;tbody.innerHTML=`<tr><td colspan="10"><p role="alert">${escapeHtml(error.message)}</p><button data-vv-action-icon="refresh" class="secondary-btn" onclick="loadInvoices()">Retry invoices</button></td></tr>`;['invoiceTotalValue','invoiceUnpaidValue','invoiceSentPaidCount'].forEach(id=>setText(id,'Not available'));}
 }
 function updateInvoiceMetrics(invoices,summary){
  setText('invoiceTotalValue',summary?invoiceMoney(summary.total_value):'Not available');setText('invoiceUnpaidValue',summary?invoiceMoney(summary.balance_value):'Not available');setText('invoiceSentPaidCount',summary?invoiceMoney(summary.paid_value):'Not available');
@@ -2722,8 +2722,8 @@ async function openInvoiceDetail(id){
  try{const res=await fetch('/api/invoice/'+Number(id)+(Number(cached?.deleted)===1?'?archived=true':''),{headers:authHeaders(),cache:'no-store'}),data=await safeJson(res);
   if(sequence!==invoiceDetailSequence||window.VoxelDialog?.active?.name!=='invoice:'+Number(id))return;
   if(!res.ok||!data.invoice||!data.summary||!Array.isArray(data.summary.lines)||!Array.isArray(data.payments)||!Array.isArray(data.activity))throw new Error(data.message||'The complete invoice could not be loaded.');
-  if(!showDialog(data.invoice.invoice_no||'Invoice details',window.VoxelInvoiceView.render(data,invoiceActions(data.invoice)+(data.invoice.rfq_id&&hasCurrentPermission('VIEW_RFQS')?`<button class="secondary-btn" onclick="hideDialog();viewOriginalRfq(${Number(data.invoice.rfq_id)})">Related RFQ</button>`:'')+(data.summary.review_required&&Number(data.invoice.deleted)!==1&&hasCurrentPermission('VOID_TRANSACTION')&&hasCurrentPermission('POST_TRANSACTION')?`<button class="secondary-btn" onclick="openInvoicePaymentReview(${Number(id)})">Review payment details</button>`:'')),hideDialog,'Close',{mode:'readonly',name:'invoice:'+Number(id)}))return;
- }catch(error){if(sequence!==invoiceDetailSequence||window.VoxelDialog?.active?.name!=='invoice:'+Number(id))return;showDialog('Invoice unavailable',`<div class="invoice-load-state"><p role="alert">${escapeHtml(error.message)}</p><button class="secondary-btn" onclick="openInvoiceDetail(${Number(id)})">Retry</button></div>`,hideDialog,'Close',{mode:'readonly',name:'invoice:'+Number(id)});}
+  if(!showDialog(data.invoice.invoice_no||'Invoice details',window.VoxelInvoiceView.render(data,invoiceActions(data.invoice)+(data.invoice.rfq_id&&hasCurrentPermission('VIEW_RFQS')?`<button data-vv-action-icon="view" class="secondary-btn" onclick="hideDialog();viewOriginalRfq(${Number(data.invoice.rfq_id)})">Related RFQ</button>`:'')+(data.summary.review_required&&Number(data.invoice.deleted)!==1&&hasCurrentPermission('VOID_TRANSACTION')&&hasCurrentPermission('POST_TRANSACTION')?`<button data-vv-action-icon="history" class="secondary-btn" onclick="openInvoicePaymentReview(${Number(id)})">Review payment details</button>`:'')),hideDialog,'Close',{mode:'readonly',name:'invoice:'+Number(id)}))return;
+ }catch(error){if(sequence!==invoiceDetailSequence||window.VoxelDialog?.active?.name!=='invoice:'+Number(id))return;showDialog('Invoice unavailable',`<div class="invoice-load-state"><p role="alert">${escapeHtml(error.message)}</p><button data-vv-action-icon="view" class="secondary-btn" onclick="openInvoiceDetail(${Number(id)})">Retry</button></div>`,hideDialog,'Close',{mode:'readonly',name:'invoice:'+Number(id)});}
 }
 async function downloadInvoicePdf(id,version){try{return await window.VoxelOperations.openPdf('/api/invoice/'+Number(id)+'/pdf?download=1'+(version?'&version='+encodeURIComponent(version):''),{download:true});}catch(error){showToast(error.message, {kind:'error'});}}
 async function openInvoicePaymentReview(id){
@@ -2750,7 +2750,7 @@ function paymentHistoryRows(payments, invoiceId) {
       <td>${escapeHtml(payment.method || '-')}</td>
       <td>${escapeHtml(payment.reference || '-')}</td>
       <td>${escapeHtml(payment.notes || '-')}</td>
-      <td><button class="danger-btn" onclick="return deleteInvoicePayment(${invoiceId}, ${payment.id})">Void payment</button></td>
+      <td><div class="vv-action-toolbar"><button data-vv-action-icon="reject" class="danger-btn" onclick="return deleteInvoicePayment(${invoiceId}, ${payment.id})">Void payment</button></div></td>
     </tr>
   `).join('');
 }
@@ -2933,10 +2933,10 @@ function statementMatchCards(matches) {
         <span>Paid ${escapeHtml(formatMoney(match.paid_amount))}</span>
         <span class="${Number(match.balance_due || 0) > 0 ? 'money-danger' : 'money-positive'}">Debt ${escapeHtml(formatMoney(match.balance_due))}</span>
       </div>
-      <div class="card-actions">
-        <button class="small-btn" onclick="return openCustomerStatementPdf(${index}, false)">Open PDF</button>
-        <button class="secondary-btn" onclick="return openCustomerStatementPdf(${index}, true)">Download</button>
-        <button class="primary-btn" onclick="return openCustomerStatementSendDialog(${index})">Send</button>
+      <div class="card-actions vv-action-toolbar">
+        <button data-vv-action-icon="pdf" class="small-btn" onclick="return openCustomerStatementPdf(${index}, false)">Open PDF</button>
+        <button data-vv-action-icon="download" class="secondary-btn" onclick="return openCustomerStatementPdf(${index}, true)">Download</button>
+        <button data-vv-action-icon="email" class="primary-btn" onclick="return openCustomerStatementSendDialog(${index})">Send</button>
       </div>
     </article>
   `).join('');
@@ -3080,8 +3080,8 @@ async function openInvoiceQrDialog(invoiceId) {
           <strong>Scan to open invoice</strong>
           <span>Invoice ${escapeHtml(invoiceNo)} opens in the secure Voxel Veda invoice viewer.</span>
         </div>
-        <div class="invoice-qr-actions">
-          <button type="button" class="primary-btn" onclick="return openInvoicePdf(${Number(invoiceId)})">Open Invoice</button>
+        <div class="invoice-qr-actions vv-action-toolbar">
+          <button data-vv-action-icon="pdf" type="button" class="primary-btn" onclick="return openInvoicePdf(${Number(invoiceId)})">Open Invoice</button>
           <a class="secondary-btn" href="${qrUrl}" download="${escapeHtml(invoiceNo)}-qr.png">Download QR</a>
         </div>
       </div>
@@ -3128,7 +3128,7 @@ async function openEditInvoiceDialog(invoiceId) {
         <div class="dialog-card">
           <h4>Line Items</h4>
           <div id="invoiceItemsContainer">${invoiceItemRows(items)}</div>
-          <button type="button" class="secondary-btn" onclick="return addInvoiceItemRow()">Add Item</button>
+          <button data-vv-action-icon="add" type="button" class="secondary-btn" onclick="return addInvoiceItemRow()">Add Item</button>
         </div>
       </div>
     `,
@@ -3201,7 +3201,7 @@ async function loadCustomers() {
           <td><strong>${escapeHtml(customer.order_count || 0)}</strong></td>
           <td><strong>${escapeHtml(formatMoney(customer.total_spend))}</strong></td>
           <td>${fileLink ? `<a href="${escapeHtml(fileLink)}" target="_blank" rel="noopener noreferrer">Open file</a><br>` : ''}<span class="muted-text">${escapeHtml(customer.notes || '-')}</span></td>
-          <td><button class="icon-btn" onclick="return openCustomerDialog(${Number(customer.id)})">Edit</button><button class="icon-btn danger-icon" onclick="return deleteCustomer(${Number(customer.id)})">Delete</button></td>
+          <td><div class="vv-action-toolbar"><button data-vv-action-icon="edit" class="icon-btn" onclick="return openCustomerDialog(${Number(customer.id)})">Edit</button><button data-vv-action-icon="delete" class="icon-btn danger-icon" onclick="return deleteCustomer(${Number(customer.id)})">Delete</button></div></td>
         </tr>
       `;
     }
@@ -3341,9 +3341,9 @@ function renderSuppliers() {
     const filePreview = files.slice(0, 3).map((file) => `
       <div class="file-row">
         <span>${escapeHtml(file.title || file.original_name)}</span>
-        <div class="file-action-row">
-          <button class="icon-btn" onclick="return viewSupplierFile(${Number(file.id)})">View</button>
-          <button class="mini-danger" onclick="return deleteSupplierFile(${Number(file.id)})">Delete</button>
+        <div class="file-action-row vv-action-toolbar">
+          <button data-vv-action-icon="view" class="icon-btn" onclick="return viewSupplierFile(${Number(file.id)})">View</button>
+          <button data-vv-action-icon="delete" class="mini-danger" onclick="return deleteSupplierFile(${Number(file.id)})">Delete</button>
         </div>
       </div>
       <small>${escapeHtml(supplierFileTypeLabel(file.file_type))} - Uploaded ${escapeHtml(formatDateTime(file.created_at))}${file.notes ? ` - ${escapeHtml(file.notes)}` : ''}</small>
@@ -3374,11 +3374,11 @@ function renderSuppliers() {
           <span class="muted-text">Created: ${escapeHtml(supplier.created_by_name || '-')}</span><br>
           <span class="muted-text">Updated: ${escapeHtml(supplier.updated_by_name || '-')}</span>
         </td>
-        <td>
-          <button class="icon-btn" onclick="return openSupplierDialog(${supplier.id})">Edit</button>
-          <button class="icon-btn" onclick="return openSupplierFileDialog(${supplier.id})">Upload</button>
-          <button class="icon-btn danger-icon" onclick="return deleteSupplier(${supplier.id})">Delete</button>
-        </td>
+        <td><div class="vv-action-toolbar">
+          <button data-vv-action-icon="edit" class="icon-btn" onclick="return openSupplierDialog(${supplier.id})">Edit</button>
+          <button data-vv-action-icon="upload" class="icon-btn" onclick="return openSupplierFileDialog(${supplier.id})">Upload</button>
+          <button data-vv-action-icon="delete" class="icon-btn danger-icon" onclick="return deleteSupplier(${supplier.id})">Delete</button>
+        </div></td>
       </tr>
     `;
     }
@@ -3631,11 +3631,11 @@ async function loadExpenses(page = expensePage) {
           ? `<button class="file-badge-btn" onclick="return openExpenseFileDialog(${expense.id})">${escapeHtml(expense.file_count)} bill${Number(expense.file_count) === 1 ? '' : 's'} attached</button>`
           : '<span class="muted-text">No bill</span>'}
       </td>
-      <td>
-        <button class="icon-btn" onclick="return openExpenseDialog(${expense.id})">Edit</button>
-        <button class="icon-btn" onclick="return openExpenseFileDialog(${expense.id})">Bill</button>
-        <button class="icon-btn danger-icon" onclick="return deleteExpense(${expense.id})">Delete</button>
-      </td>
+      <td><div class="vv-action-toolbar">
+        <button data-vv-action-icon="edit" class="icon-btn" onclick="return openExpenseDialog(${expense.id})">Edit</button>
+        <button data-vv-action-icon="document" class="icon-btn" onclick="return openExpenseFileDialog(${expense.id})">Bill</button>
+        <button data-vv-action-icon="delete" class="icon-btn danger-icon" onclick="return deleteExpense(${expense.id})">Delete</button>
+      </div></td>
     </tr>
   `).join('');
 }
@@ -3868,9 +3868,9 @@ function openExpenseFileDialog(id) {
           ${file.uploaded_by_name ? ` by ${escapeHtml(file.uploaded_by_name)}` : ''}
         </small>
       </div>
-      <div class="file-action-row">
-        <button class="icon-btn" onclick="return viewExpenseFile(${Number(file.id)})">View</button>
-        <button class="mini-danger" onclick="return deleteExpenseFile(${Number(file.id)})">Delete</button>
+      <div class="file-action-row vv-action-toolbar">
+        <button data-vv-action-icon="view" class="icon-btn" onclick="return viewExpenseFile(${Number(file.id)})">View</button>
+        <button data-vv-action-icon="delete" class="mini-danger" onclick="return deleteExpenseFile(${Number(file.id)})">Delete</button>
       </div>
     </div>
   `).join('') : '<div class="empty-state">No bill photo or file uploaded yet.</div>';
@@ -4094,12 +4094,12 @@ function renderCompetitors() {
                   <strong>${escapeHtml(company.strength || company.notes || '-')}</strong>
                 </div>
               </div>
-              <div class="competitor-actions">
+              <div class="competitor-actions vv-action-toolbar">
                 ${website ? `<a class="icon-btn" href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">Website</a>` : ''}
                 ${sourceUrl ? `<a class="icon-btn" href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">Source</a>` : ''}
                 <a class="icon-btn" href="https://www.google.com/search?q=${escapeHtml(onlineQuery)}" target="_blank" rel="noopener noreferrer">Search Online</a>
-                <button class="icon-btn" onclick="return openCompetitorDialog(${Number(company.id)})">Edit</button>
-                <button class="danger-btn" onclick="return deleteCompetitor(${Number(company.id)})">Delete</button>
+                <button data-vv-action-icon="edit" class="icon-btn" onclick="return openCompetitorDialog(${Number(company.id)})">Edit</button>
+                <button data-vv-action-icon="delete" class="danger-btn" onclick="return deleteCompetitor(${Number(company.id)})">Delete</button>
               </div>
             </article>
           `;
@@ -4323,7 +4323,7 @@ function renderComplianceCard(entry) {
   const fileList = files.map((file) => `
     <div class="file-row">
       <a href="${escapeHtml(safeDocumentHref(file.download_url) || `/api/compliance/files/${Number(file.id)}/view`)}" target="_blank" rel="noopener">${escapeHtml(file.file_label || file.original_name)}</a>
-      <button class="mini-danger" onclick="return deleteComplianceFile(${Number(file.id)})">Delete</button>
+      <button data-vv-action-icon="delete" class="mini-danger" onclick="return deleteComplianceFile(${Number(file.id)})">Delete</button>
     </div>
     <small>${escapeHtml(complianceFileTypeLabel(file.file_type))} - Uploaded ${escapeHtml(formatDateTime(file.created_at))} by ${escapeHtml(file.uploaded_by_name || '-')}</small>
   `).join('');
@@ -4348,10 +4348,10 @@ function renderComplianceCard(entry) {
       ${entry.filled_notes ? `<p>${escapeHtml(entry.filled_notes)}</p>` : ''}
       ${safeExternalHttpUrl(entry.official_link) ? `<a class="secondary-link" href="${escapeHtml(safeExternalHttpUrl(entry.official_link))}" target="_blank" rel="noopener noreferrer">Preview original form / guidance</a>` : ''}
       <div class="compliance-files">${fileList || '<span class="muted-text">No uploaded forms yet.</span>'}</div>
-      <div class="dialog-actions inline-actions">
-        <button class="icon-btn" onclick="return openComplianceDialog(${entry.id})">Edit / Fill</button>
-        <button class="icon-btn" onclick="return openComplianceFileDialog(${entry.id})">Upload</button>
-        <button class="icon-btn danger-icon" onclick="return deleteComplianceEntry(${entry.id})">Delete</button>
+      <div class="dialog-actions inline-actions vv-action-toolbar">
+        <button data-vv-action-icon="edit" class="icon-btn" onclick="return openComplianceDialog(${entry.id})">Edit / Fill</button>
+        <button data-vv-action-icon="upload" class="icon-btn" onclick="return openComplianceFileDialog(${entry.id})">Upload</button>
+        <button data-vv-action-icon="delete" class="icon-btn danger-icon" onclick="return deleteComplianceEntry(${entry.id})">Delete</button>
       </div>
     </article>
   `;
@@ -4596,12 +4596,12 @@ async function loadTasks() {
         <td>${escapeHtml(t.priority || '-')}</td>
         <td>${escapeHtml(String(t.due_date || '').slice(0, 10))}</td>
         <td>${escapeHtml(t.status || '-')}</td>
-        <td>
-          <button class="small-btn" onclick="return updateTask(${t.id}, 'in_progress')">Start</button>
-          <button class="small-btn" onclick="return updateTask(${t.id}, 'done')">Done</button>
-          <button class="small-btn" onclick="return openTaskDialog(${t.id})">Edit</button>
-          <button class="small-btn danger-icon" onclick="return deleteTask(${t.id})">Delete</button>
-        </td>
+        <td><div class="vv-action-toolbar">
+          <button data-vv-action-icon="start" class="small-btn" onclick="return updateTask(${t.id}, 'in_progress')">Start</button>
+          <button data-vv-action-icon="complete" class="small-btn" onclick="return updateTask(${t.id}, 'done')">Done</button>
+          <button data-vv-action-icon="edit" class="small-btn" onclick="return openTaskDialog(${t.id})">Edit</button>
+          <button data-vv-action-icon="delete" class="small-btn danger-icon" onclick="return deleteTask(${t.id})">Delete</button>
+        </div></td>
       </tr>
     `
   });
@@ -4764,10 +4764,10 @@ async function loadAnnouncements() {
         <td>${escapeHtml(formatDate(item.starts_at))}</td>
         <td>${escapeHtml(formatDate(item.expires_at))}</td>
         <td>${escapeHtml(item.created_by_name || '-')}</td>
-        <td>
-          <button class="icon-btn" onclick="return openAnnouncementDialog(${item.id})">Edit</button>
-          <button class="icon-btn danger-icon" onclick="return deleteAnnouncement(${item.id})">Delete</button>
-        </td>
+        <td><div class="vv-action-toolbar">
+          <button data-vv-action-icon="edit" class="icon-btn" onclick="return openAnnouncementDialog(${item.id})">Edit</button>
+          <button data-vv-action-icon="delete" class="icon-btn danger-icon" onclick="return deleteAnnouncement(${item.id})">Delete</button>
+        </div></td>
       </tr>
     `;
     }
@@ -4927,12 +4927,12 @@ async function loadStaff() {
           <td>${statusBadge(String(u.account_status || (u.active ? 'ACTIVE' : 'DISABLED')).toLowerCase())}</td>
           <td><span class="security-posture ${u.mfa_enabled ? 'secure' : 'warning'}">${u.mfa_enabled ? 'MFA' : 'No MFA'}</span><small>${Number(u.active_session_count || 0)} sessions</small></td>
           <td>
-            <div class="staff-account-actions">
-              <button class="small-btn" onclick="return openEditStaffDialog(${u.id})">Edit</button>
-              <button class="small-btn" onclick="return openAccessDialog(${u.id})">Access</button>
-              <button class="secondary-btn" onclick="return openPasswordResetDialog(${u.id})">Reset Password</button>
-              ${Number(u.id) === Number(currentUser.id) ? '' : `<button class="secondary-btn" onclick="return openUserSecurityDialog(${u.id})">Security Actions</button>`}
-              ${Number(u.id) === Number(currentUser.id) ? '' : `<button class="danger-btn" onclick="return openTerminateStaffDialog(${u.id})">Terminate Access</button>`}
+            <div class="staff-account-actions vv-action-toolbar">
+              <button data-vv-action-icon="edit" class="small-btn" onclick="return openEditStaffDialog(${u.id})">Edit</button>
+              <button data-vv-action-icon="access" class="small-btn" onclick="return openAccessDialog(${u.id})">Access</button>
+              <button data-vv-action-icon="password" class="secondary-btn" onclick="return openPasswordResetDialog(${u.id})">Reset Password</button>
+              ${Number(u.id) === Number(currentUser.id) ? '' : `<button data-vv-action-icon="security" class="secondary-btn" onclick="return openUserSecurityDialog(${u.id})">Security Actions</button>`}
+              ${Number(u.id) === Number(currentUser.id) ? '' : `<button data-vv-action-icon="terminate" class="danger-btn" onclick="return openTerminateStaffDialog(${u.id})">Terminate Access</button>`}
             </div>
           </td>
         </tr>
@@ -5039,9 +5039,9 @@ function renderServerWorkHubRequest(row) {
         ${meta ? `<small>${escapeHtml(meta)}</small>` : ''}
         ${row.body ? `<small>${escapeHtml(row.body)}</small>` : ''}
       </div>
-      <div class="admin-message-actions">
-        <button type="button" class="primary-btn small-btn" onclick="return updateStaffWorkRequest(${Number(row.id)}, 'Approved')">Approve</button>
-        <button type="button" class="danger-btn small-btn" onclick="return deleteStaffWorkRequest(${Number(row.id)})">Delete</button>
+      <div class="admin-message-actions vv-action-toolbar">
+        <button data-vv-action-icon="approve" type="button" class="primary-btn small-btn" onclick="return updateStaffWorkRequest(${Number(row.id)}, 'Approved')">Approve</button>
+        <button data-vv-action-icon="delete" type="button" class="danger-btn small-btn" onclick="return deleteStaffWorkRequest(${Number(row.id)})">Delete</button>
       </div>
     </article>`;
 }
@@ -5065,7 +5065,7 @@ function renderAdminWorkHubRows(type) {
         <span>${escapeHtml(row.assigned || 'All assigned staff')} | ${escapeHtml(row.due || 'No due date')} | ${escapeHtml(row.status || 'Open')}</span>
         ${row.notes ? `<small>${escapeHtml(row.notes)}</small>` : ''}
       </div>
-      <button type="button" class="danger-btn small-btn" onclick="return deleteAdminWorkHubEntry('${type}', ${Number(row.id)})">Delete</button>
+      <button data-vv-action-icon="delete" type="button" class="danger-btn small-btn" onclick="return deleteAdminWorkHubEntry('${type}', ${Number(row.id)})">Delete</button>
     </article>
   `).join('');
   return serverHtml + localHtml;
@@ -5206,9 +5206,9 @@ function renderAdminStaffMessageRow(row) {
         <span>${escapeHtml(row.body || '')}</span>
         <small>${escapeHtml(new Date(row.created_at || Date.now()).toLocaleString())} | ${escapeHtml(row.status || 'Open')}</small>
       </div>
-      <div class="admin-message-actions">
-        <button type="button" class="primary-btn small-btn" onclick="return updateAdminStaffMessage(${Number(row.id)}, 'Approved')">Approve</button>
-        <button type="button" class="danger-btn small-btn" onclick="return deleteAdminStaffMessage(${Number(row.id)})">Delete</button>
+      <div class="admin-message-actions vv-action-toolbar">
+        <button data-vv-action-icon="approve" type="button" class="primary-btn small-btn" onclick="return updateAdminStaffMessage(${Number(row.id)}, 'Approved')">Approve</button>
+        <button data-vv-action-icon="delete" type="button" class="danger-btn small-btn" onclick="return deleteAdminStaffMessage(${Number(row.id)})">Delete</button>
       </div>
     </article>`;
 }
@@ -5221,7 +5221,7 @@ async function openAdminStaffMessages() {
       <section>
         <div class="admin-workhub-register-head">
           <h4>Incoming Staff Queue</h4>
-          <button type="button" class="secondary-btn small-btn" onclick="return refreshAdminStaffMessagesPanel()">Refresh</button>
+          <button data-vv-action-icon="refresh" type="button" class="secondary-btn small-btn" onclick="return refreshAdminStaffMessagesPanel()">Refresh</button>
         </div>
         <div id="adminStaffMessageRegister" class="admin-workhub-register">${renderAdminUnifiedStaffQueueRows()}</div>
       </section>
@@ -5965,7 +5965,7 @@ async function loadEmailControl() {
       const state = String(row.status || 'PENDING').toUpperCase();
       const queueId = Number(row.queue_id || row.id || 0);
       const retryButton = ['FAILED', 'RETRY'].includes(state) && queueId
-        ? `<button type="button" class="secondary-btn compact-btn" onclick="return retryEmailDelivery(${queueId})">Retry</button>`
+        ? `<button data-vv-action-icon="refresh" type="button" class="secondary-btn compact-btn" onclick="return retryEmailDelivery(${queueId})">Retry</button>`
         : '';
       return `
         <article class="email-delivery-row ${emailStatusClass(state)}">
@@ -6256,11 +6256,11 @@ async function loadMaterials(type) {
           <td>${escapeHtml(formatMoney(item.unit_price))}</td>
           <td><strong>${escapeHtml(formatMoney(item.current_value))}</strong></td>
           <td><span class="${isLow ? 'badge danger-badge' : 'badge active-badge'}">${isLow ? 'Reorder' : 'OK'}</span></td>
-          <td>
-            <button class="icon-btn" onclick="return openMaterialDialog('${type}', ${item.id})">Edit</button>
-            <button class="icon-btn" onclick="return openProcessSheetPdf(${item.id})">Process PDF</button>
-            <button class="icon-btn danger-icon" onclick="return deleteMaterial('${type}', ${item.id})">Delete</button>
-          </td>
+          <td><div class="vv-action-toolbar">
+            <button data-vv-action-icon="edit" class="icon-btn" onclick="return openMaterialDialog('${type}', ${item.id})">Edit</button>
+            <button data-vv-action-icon="pdf" class="icon-btn" onclick="return openProcessSheetPdf(${item.id})">Process PDF</button>
+            <button data-vv-action-icon="delete" class="icon-btn danger-icon" onclick="return deleteMaterial('${type}', ${item.id})">Delete</button>
+          </div></td>
         </tr>
       `;
     }
@@ -6580,11 +6580,11 @@ async function loadStock() {
           <strong>Created: ${escapeHtml(item.created_by_name || '-')}</strong><br>
           <span>Updated: ${escapeHtml(item.updated_by_name || '-')}</span>
         </td>
-        <td>
-          <button class="icon-btn" title="Edit stock" onclick="return openStockDialogById(${item.id})">Edit</button>
-          <button class="icon-btn" title="Minus stock" onclick="return openIssueStockDialog(${item.id})">Issue</button>
-          <button class="icon-btn danger-icon" title="Delete stock" onclick="return deleteStock(${item.id})">Delete</button>
-        </td>
+        <td><div class="vv-action-toolbar">
+          <button data-vv-action-icon="edit" class="icon-btn" title="Edit stock" onclick="return openStockDialogById(${item.id})">Edit</button>
+          <button data-vv-action-icon="issue" class="icon-btn" title="Minus stock" onclick="return openIssueStockDialog(${item.id})">Issue</button>
+          <button data-vv-action-icon="delete" class="icon-btn danger-icon" title="Delete stock" onclick="return deleteStock(${item.id})">Delete</button>
+        </div></td>
       </tr>
     `
   });
@@ -6793,10 +6793,10 @@ async function loadStockUsage() {
         <td>${escapeHtml(item.issued_to || '-')}</td>
         <td>${escapeHtml(item.notes || '-')}</td>
         <td>${escapeHtml(item.created_by_name || '-')}</td>
-        <td>
-          <button class="icon-btn" title="Edit stock out" onclick="return openStockUsageDialogById(${item.id})">Edit</button>
-          <button class="icon-btn danger-icon" title="Delete stock out" onclick="return deleteStockUsage(${item.id})">Delete</button>
-        </td>
+        <td><div class="vv-action-toolbar">
+          <button data-vv-action-icon="edit" class="icon-btn" title="Edit stock out" onclick="return openStockUsageDialogById(${item.id})">Edit</button>
+          <button data-vv-action-icon="delete" class="icon-btn danger-icon" title="Delete stock out" onclick="return deleteStockUsage(${item.id})">Delete</button>
+        </div></td>
       </tr>
     `
   });
@@ -6887,9 +6887,9 @@ async function loadAttendance() {
         <td><strong>${escapeHtml(Number(a.total_hours || 0).toFixed(2))}</strong></td>
         <td>${renderTimesheetNote(a.notes)}</td>
         <td>
-          <div class="table-action-stack">
-            <button class="small-btn" onclick="return openAttendanceDialog(${a.id})">Edit</button>
-            <button class="danger-btn" onclick="return deleteAttendance(${a.id})">Delete</button>
+          <div class="table-action-stack vv-action-toolbar">
+            <button data-vv-action-icon="edit" class="small-btn" onclick="return openAttendanceDialog(${a.id})">Edit</button>
+            <button data-vv-action-icon="delete" class="danger-btn" onclick="return deleteAttendance(${a.id})">Delete</button>
           </div>
         </td>
       </tr>
@@ -7136,9 +7136,9 @@ async function loadMeetings() {
         <td>${escapeHtml(meetingAttendeeNames(meeting.assigned_user_ids))}</td>
         <td><span class="${meetingStatusClass(meeting.status)}">${escapeHtml(meeting.status || 'scheduled')}</span></td>
         <td>
-          <div class="table-action-stack">
-            <button class="small-btn" onclick="return openMeetingDialog(${meeting.id})">Edit</button>
-            <button class="danger-btn" onclick="return deleteMeeting(${meeting.id})">Delete</button>
+          <div class="table-action-stack vv-action-toolbar">
+            <button data-vv-action-icon="edit" class="small-btn" onclick="return openMeetingDialog(${meeting.id})">Edit</button>
+            <button data-vv-action-icon="delete" class="danger-btn" onclick="return deleteMeeting(${meeting.id})">Delete</button>
           </div>
         </td>
       </tr>
@@ -7334,9 +7334,9 @@ async function loadRoster() {
           <span class="cell-subtext">Updated: ${escapeHtml(shift.updated_by_name || '-')}</span>
         </td>
         <td>
-          <div class="table-action-stack">
-            <button class="small-btn" onclick="return openRosterShiftDialog(${shift.id})">Edit</button>
-            <button class="danger-btn" onclick="return deleteRosterShift(${shift.id})">Delete</button>
+          <div class="table-action-stack vv-action-toolbar">
+            <button data-vv-action-icon="edit" class="small-btn" onclick="return openRosterShiftDialog(${shift.id})">Edit</button>
+            <button data-vv-action-icon="delete" class="danger-btn" onclick="return deleteRosterShift(${shift.id})">Delete</button>
           </div>
         </td>
       </tr>
@@ -7875,7 +7875,7 @@ async function reviewTimesheetAttendance(detail) {
   const record=detail.timesheet,source=detail.summary;
   const go=()=>{if(window.VoxelStaffHome)return window.VoxelStaffHome.openHistory('all',{userId:record.user_id,from:String(record.week_start).slice(0,10),to:String(record.week_end).slice(0,10)});
     const rows=source.records||[];attendanceCache=[...attendanceCache.filter(r=>!rows.some(a=>Number(a.id)===Number(r.id))),...rows];
-    showDialog('Review source attendance',`<p>${escapeHtml(record.name||record.staff_name||'Staff')} · ${escapeHtml(VoxelActions.date(record.week_start))} – ${escapeHtml(VoxelActions.date(record.week_end))}</p><p>Workplace timezone: ${escapeHtml(source.company_timezone||source.timezone||'Australia/Sydney')}. Confirm actual start, finish and recorded unpaid breaks. Saved review flags are not resolved by entering approved hours.</p><div class="source-review-list">${rows.map(row=>`<article><strong>Attendance #${Number(row.id)}</strong><dl><div><dt>Start</dt><dd>${escapeHtml(formatDateTime(row.clock_in))}</dd></div><div><dt>Finish</dt><dd>${row.clock_out?escapeHtml(formatDateTime(row.clock_out)):'Not recorded'}</dd></div><div><dt>Recorded breaks</dt><dd>${row.break_minutes==null?'Not recorded':Number(row.break_minutes)+' minutes'}</dd></div></dl>${hasCurrentPermission('EDIT_ATTENDANCE')?`<button class="secondary-btn" onclick="return openAttendanceDialog(${Number(row.id)})">Review / correct this session</button>`:''}</article>`).join('')||'<p>No source records in this reporting period.</p>'}</div><button class="secondary-btn" onclick="return openTimesheetDecision(${Number(record.id)},'approve')">Reload verified hours after correction</button>`,null,'Close');};
+    showDialog('Review source attendance',`<p>${escapeHtml(record.name||record.staff_name||'Staff')} · ${escapeHtml(VoxelActions.date(record.week_start))} – ${escapeHtml(VoxelActions.date(record.week_end))}</p><p>Workplace timezone: ${escapeHtml(source.company_timezone||source.timezone||'Australia/Sydney')}. Confirm actual start, finish and recorded unpaid breaks. Saved review flags are not resolved by entering approved hours.</p><div class="source-review-list">${rows.map(row=>`<article><strong>Attendance #${Number(row.id)}</strong><dl><div><dt>Start</dt><dd>${escapeHtml(formatDateTime(row.clock_in))}</dd></div><div><dt>Finish</dt><dd>${row.clock_out?escapeHtml(formatDateTime(row.clock_out)):'Not recorded'}</dd></div><div><dt>Recorded breaks</dt><dd>${row.break_minutes==null?'Not recorded':Number(row.break_minutes)+' minutes'}</dd></div></dl>${hasCurrentPermission('EDIT_ATTENDANCE')?`<button data-vv-action-icon="edit" class="secondary-btn" onclick="return openAttendanceDialog(${Number(row.id)})">Review / correct this session</button>`:''}</article>`).join('')||'<p>No source records in this reporting period.</p>'}</div><button data-vv-action-icon="refresh" class="secondary-btn" onclick="return openTimesheetDecision(${Number(record.id)},'approve')">Reload verified hours after correction</button>`,null,'Close');};
   if(window.VoxelDialog?.active?.dirty){const answer=await VoxelFeedback.show({kind:'warning',title:'Open attendance review?',message:'The approval has not been saved. Discard the entered approval values to review the source attendance.',actions:[{label:'Return to form'},{label:'Review attendance',value:'review'}]});if(answer!=='review')return;}hideDialog();go();
 }
 
@@ -7917,12 +7917,12 @@ function renderTimesheetReviewActions(timesheet) {
   const status = String(timesheet.status || 'DRAFT').toUpperCase();
   if (!id) return '-';
   if (status === 'APPROVED') {
-    return `<div class="table-action-stack timesheet-review-actions"><button class="secondary-btn small" onclick="return openTimesheetDetail(${id})">View</button><button class="secondary-btn small" onclick="return openTimesheetDecision(${id}, 'amend', ${Number(timesheet.approved_hours || 0)})">Amend</button></div>`;
+    return `<div class="table-action-stack timesheet-review-actions vv-action-toolbar"><button data-vv-action-icon="view" class="secondary-btn small" onclick="return openTimesheetDetail(${id})">View</button><button data-vv-action-icon="revision" class="secondary-btn small" onclick="return openTimesheetDecision(${id}, 'amend', ${Number(timesheet.approved_hours || 0)})">Amend</button></div>`;
   }
   if (['PENDING_APPROVAL', 'CORRECTION_RESUBMITTED'].includes(status)) {
-    return `<div class="table-action-stack timesheet-review-actions"><button class="secondary-btn small" onclick="return openTimesheetDetail(${id})">View</button><button class="small-btn" onclick="return openTimesheetDecision(${id}, 'approve', ${Number(timesheet.total_hours || 0)})">Approve</button><button class="secondary-btn small" onclick="return openTimesheetDecision(${id}, 'correction', ${Number(timesheet.total_hours || 0)})">Correction</button><button class="danger-btn small" onclick="return openTimesheetDecision(${id}, 'reject', ${Number(timesheet.total_hours || 0)})">Reject</button></div>`;
+    return `<div class="table-action-stack timesheet-review-actions vv-action-toolbar"><button data-vv-action-icon="view" class="secondary-btn small" onclick="return openTimesheetDetail(${id})">View</button><button data-vv-action-icon="approve" class="small-btn" onclick="return openTimesheetDecision(${id}, 'approve', ${Number(timesheet.total_hours || 0)})">Approve</button><button data-vv-action-icon="correction" class="secondary-btn small" onclick="return openTimesheetDecision(${id}, 'correction', ${Number(timesheet.total_hours || 0)})">Correction</button><button data-vv-action-icon="reject" class="danger-btn small" onclick="return openTimesheetDecision(${id}, 'reject', ${Number(timesheet.total_hours || 0)})">Reject</button></div>`;
   }
-  return `<div class="table-action-stack timesheet-review-actions"><button class="secondary-btn small" onclick="return openTimesheetDetail(${id})">View</button></div>`;
+  return `<div class="table-action-stack timesheet-review-actions vv-action-toolbar"><button data-vv-action-icon="view" class="secondary-btn small" onclick="return openTimesheetDetail(${id})">View</button></div>`;
 }
 
 function timesheetHours(value){return value!==null&&value!==undefined&&value!==''&&Number.isFinite(Number(value))?Number(value).toFixed(2):'Unavailable';}
@@ -8039,12 +8039,12 @@ async function loadWeeklyTimesheetDeliveries(page = 1) {
     body.innerHTML = weeklyDeliveryState.deliveries.length ? weeklyDeliveryState.deliveries.map(row => {
       const id = Number(row.id), version = Number(row.version);
       const pdf = Number(row.document_request_id);
-      return `<tr><td>${escapeHtml(row.staff_name || 'Staff')}<span class="cell-subtext">Staff #${Number(row.user_id)}</span></td><td>${escapeHtml(String(row.period_start || '').slice(0,10))}<span class="cell-subtext">to ${escapeHtml(String(row.period_end || '').slice(0,10))} · ${escapeHtml(row.timezone)}</span></td><td>${escapeHtml(weeklyDeliveryHours(row))}</td><td>Version ${version}<span class="cell-subtext">${escapeHtml(String(row.status || '').replaceAll('_',' '))}</span></td><td>${escapeHtml(weeklyDeliveryReasons(row) || 'No review issue recorded')}<span class="cell-subtext">${row.provider_accepted_at ? 'Provider accepted · recipient receipt unverified' : 'Provider acceptance unconfirmed'}${row.sent_at ? ' · Transport sent' : ''}</span></td><td><div class="row-actions"><button class="secondary-btn" onclick="return openWeeklyDeliveryDetail(${id})">Details</button>${Number.isSafeInteger(pdf) && pdf > 0 ? `<button class="secondary-btn" onclick="return openWeeklyDeliveryPdf(${pdf})">Individual PDF</button>` : ''}${canManageWeeklyDelivery() ? `<button class="secondary-btn" onclick="return openWeeklyDeliveryRevision(${id})">Authorise revision</button>${row.status === 'GENERATION_FAILED' && !row.email_queue_id ? `<button class="secondary-btn" onclick="return openWeeklyDeliveryRevision(${id}, true)">Retry generation</button>` : ''}` : ''}</div></td></tr>`;
+      return `<tr><td>${escapeHtml(row.staff_name || 'Staff')}<span class="cell-subtext">Staff #${Number(row.user_id)}</span></td><td>${escapeHtml(String(row.period_start || '').slice(0,10))}<span class="cell-subtext">to ${escapeHtml(String(row.period_end || '').slice(0,10))} · ${escapeHtml(row.timezone)}</span></td><td>${escapeHtml(weeklyDeliveryHours(row))}</td><td>Version ${version}<span class="cell-subtext">${escapeHtml(String(row.status || '').replaceAll('_',' '))}</span></td><td>${escapeHtml(weeklyDeliveryReasons(row) || 'No review issue recorded')}<span class="cell-subtext">${row.provider_accepted_at ? 'Provider accepted · recipient receipt unverified' : 'Provider acceptance unconfirmed'}${row.sent_at ? ' · Transport sent' : ''}</span></td><td><div class="row-actions vv-action-toolbar"><button data-vv-action-icon="view" class="secondary-btn" onclick="return openWeeklyDeliveryDetail(${id})">Details</button>${Number.isSafeInteger(pdf) && pdf > 0 ? `<button data-vv-action-icon="pdf" class="secondary-btn" onclick="return openWeeklyDeliveryPdf(${pdf})">Individual PDF</button>` : ''}${canManageWeeklyDelivery() ? `<button data-vv-action-icon="revision" class="secondary-btn" onclick="return openWeeklyDeliveryRevision(${id})">Authorise revision</button>${row.status === 'GENERATION_FAILED' && !row.email_queue_id ? `<button data-vv-action-icon="refresh" class="secondary-btn" onclick="return openWeeklyDeliveryRevision(${id}, true)">Retry generation</button>` : ''}` : ''}</div></td></tr>`;
     }).join('') : '<tr><td colspan="6">No weekly deliveries match these filters.</td></tr>';
     const summary = document.getElementById('weeklyDeliveryPageSummary');
     if (summary) summary.textContent = `${Number(data.total || 0)} deliveries · Page ${weeklyDeliveryState.page} of ${weeklyDeliveryState.pages}`;
     enhanceResponsiveTables();
-  } catch (error) { if(current())body.innerHTML = `<tr><td colspan="6">${escapeHtml(error.message || 'Weekly delivery diagnostics are unavailable')} <button type="button" class="secondary-btn" onclick="loadWeeklyTimesheetDeliveries(weeklyDeliveryState.page)">Retry</button></td></tr>`; }
+  } catch (error) { if(current())body.innerHTML = `<tr><td colspan="6">${escapeHtml(error.message || 'Weekly delivery diagnostics are unavailable')} <button data-vv-action-icon="refresh" type="button" class="secondary-btn" onclick="loadWeeklyTimesheetDeliveries(weeklyDeliveryState.page)">Retry</button></td></tr>`; }
 }
 async function openWeeklyDeliveryPdf(requestId) {
   const id = Number(requestId);
@@ -8064,7 +8064,7 @@ async function openWeeklyDeliveryDetail(deliveryId) {
     if(!current())return;
     if (!response.ok) throw new Error(data.message || 'Delivery details could not be loaded');
     const row = data.delivery || {};
-    showDialog('Individual weekly delivery history', `<p>Staff #${Number(row.user_id)} · ${escapeHtml(String(row.period_start || '').slice(0,10))} to ${escapeHtml(String(row.period_end || '').slice(0,10))} · ${escapeHtml(row.timezone)}</p><p>Version ${Number(row.version)} · ${escapeHtml(row.status)} · ${escapeHtml(weeklyDeliveryHours(row))} snapshot hours · ${row.delivery_format === 'HTML' ? 'Complete HTML email' : 'PDF document email'}</p><p>${escapeHtml(weeklyDeliveryReasons(row) || 'No review issue recorded')}</p><p class="status-note">Each version contains only this staff member’s worked attendance. Provider acceptance and recipient receipt are separate states; recipient receipt remains unverified.</p><h4>Retained versions</h4>${(data.versions || []).map(version => `<p>Version ${Number(version.version)} · ${escapeHtml(version.status)} · ${escapeHtml(version.reason || 'Scheduled delivery')} · ${escapeHtml(formatDateTime(version.created_at))}${Number(version.document_request_id) > 0 ? ` <button class="secondary-btn" onclick="return openWeeklyDeliveryPdf(${Number(version.document_request_id)})">Individual PDF</button>` : ''}</p>`).join('') || '<p>No previous revision recorded.</p>'}`, hideDialog, 'Close');
+    showDialog('Individual weekly delivery history', `<p>Staff #${Number(row.user_id)} · ${escapeHtml(String(row.period_start || '').slice(0,10))} to ${escapeHtml(String(row.period_end || '').slice(0,10))} · ${escapeHtml(row.timezone)}</p><p>Version ${Number(row.version)} · ${escapeHtml(row.status)} · ${escapeHtml(weeklyDeliveryHours(row))} snapshot hours · ${row.delivery_format === 'HTML' ? 'Complete HTML email' : 'PDF document email'}</p><p>${escapeHtml(weeklyDeliveryReasons(row) || 'No review issue recorded')}</p><p class="status-note">Each version contains only this staff member’s worked attendance. Provider acceptance and recipient receipt are separate states; recipient receipt remains unverified.</p><h4>Retained versions</h4>${(data.versions || []).map(version => `<p>Version ${Number(version.version)} · ${escapeHtml(version.status)} · ${escapeHtml(version.reason || 'Scheduled delivery')} · ${escapeHtml(formatDateTime(version.created_at))}${Number(version.document_request_id) > 0 ? ` <button data-vv-action-icon="pdf" class="secondary-btn" onclick="return openWeeklyDeliveryPdf(${Number(version.document_request_id)})">Individual PDF</button>` : ''}</p>`).join('') || '<p>No previous revision recorded.</p>'}`, hideDialog, 'Close');
   } catch (error) { if(current())showToast(error.message || 'Delivery details are unavailable', {kind:'error'}); }
 }
 function openWeeklyDeliveryRevision(deliveryId, retryGeneration = false, previousReason = '', requireUncertainConfirmation = false) {

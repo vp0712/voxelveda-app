@@ -381,12 +381,10 @@
           <div>
             <h2>Invoice register</h2>
           </div>
-          <div class="invoice-register-actions">
-            <button onclick="return openCustomerStatementDialog()" class="secondary-btn">Customer Statement</button>
-            <details class="record-action-menu"><summary>Create invoice</summary><div>
-              <button onclick="return manualCreateInvoice()" class="secondary-btn">Create From RFQ</button>
-              <button onclick="return openManualInvoiceDialog()" class="primary-btn">Manual Invoice</button>
-            </div></details>
+          <div class="invoice-register-actions vv-action-toolbar">
+            <button onclick="return openCustomerStatementDialog()" data-vv-action-icon="document" class="secondary-btn">Customer Statement</button>
+            <button onclick="return manualCreateInvoice()" data-vv-action-icon="link" class="secondary-btn">Create From RFQ</button>
+            <button onclick="return openManualInvoiceDialog()" data-vv-action-icon="add" class="primary-btn">Manual Invoice</button>
           </div>
         </div>
 
@@ -1528,11 +1526,11 @@
 
 
   <nav class="mobile-bottom-nav admin-mobile-bottom-nav" aria-label="Admin mobile quick navigation">
-    <button type="button" class="nav-btn" data-section="dashboardSection">Home</button>
-    <button type="button" class="nav-btn" data-section="attendanceSection">Workforce</button>
-    <button type="button" class="nav-btn" data-section="taskSection">Tasks</button>
-    <button type="button" data-notification-toggle onclick="return toggleNotificationPanel(event)">Alerts</button>
-    <button type="button" data-mobile-menu-action="open">More</button>
+    <button type="button" class="nav-btn" data-section="dashboardSection" data-vv-action-icon="home">Home</button>
+    <button type="button" class="nav-btn" data-section="attendanceSection" data-vv-action-icon="users">Workforce</button>
+    <button type="button" class="nav-btn" data-section="taskSection" data-vv-action-icon="tasks">Tasks</button>
+    <button type="button" data-notification-toggle data-vv-action-icon="bell" onclick="return toggleNotificationPanel(event)">Alerts</button>
+    <button type="button" data-mobile-menu-action="open" data-vv-action-icon="grid" title="All modules">More</button>
   </nav>
   <div id="toast" class="toast"></div>
 

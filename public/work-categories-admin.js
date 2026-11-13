@@ -3,7 +3,7 @@
   let epoch=0;
   const body=()=>document.getElementById('dialogBody');
   const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const button=(label,run)=>{const b=document.createElement('button');b.type='button';b.className='secondary-btn';b.textContent=label;b.onclick=run;return b;};
+  const button=(label,run,icon)=>{const b=document.createElement('button');b.type='button';b.className='secondary-btn';b.textContent=label;if(icon){b.dataset.vvActionIcon=icon;b.title=label;}b.onclick=run;return b;};
   async function api(path,input) {
     const response=await fetch('/api/settings/work-categories'+path,{method:input?'POST':'GET',headers:authHeaders(),credentials:'same-origin',cache:'no-store',...(input?{body:JSON.stringify(input)}:{})});
     const data=await safeJson(response);if(!response.ok)throw Object.assign(new Error(data.message||'Work categories are unavailable. Retry.'),{status:response.status});return data;
@@ -25,14 +25,16 @@
     try {
       const data=await api('?'+new URLSearchParams({page,search}));if(turn!==epoch||body()!==target||document.getElementById('dialogTitle').textContent!=='Attendance work categories')return;
       target.innerHTML='<p>Active categories appear immediately for staff without requiring previous attendance. Renaming or deactivating a category preserves recorded summaries.</p>';
-      target.append(button('Add category',()=>edit(null,data)));
-      const label=document.createElement('label');label.textContent='Search categories';const input=document.createElement('input');input.type='search';input.maxLength=120;input.value=search;label.append(input);target.append(label,button('Search',()=>openWorkCategorySettings(1,input.value.trim())));
+      target.append(button('Add category',()=>edit(null,data),'add'));
+      const label=document.createElement('label');label.textContent='Search categories';const input=document.createElement('input');input.type='search';input.maxLength=120;input.value=search;label.append(input);target.append(label,button('Search',()=>openWorkCategorySettings(1,input.value.trim()),'search'));
       if(!data.items.length){const empty=document.createElement('p');empty.textContent=search?'No matching categories.':'No work categories configured. Add your company’s actual work categories.';target.append(empty);}
-      for(const row of data.items){const section=document.createElement('section');section.className='record-card';const title=document.createElement('h3');title.textContent=row.name;const detail=document.createElement('p');detail.textContent=`${Number(row.active)?'Active':'Inactive'} · ${row.site_id||'All workplaces'} · ${row.role_scope||'All permitted staff roles'}`;section.append(title,detail,button('Edit category',()=>edit(row,data)));target.append(section);}
+      for(const row of data.items){const section=document.createElement('section');section.className='record-card';const title=document.createElement('h3');title.textContent=row.name;const detail=document.createElement('p');detail.textContent=`${Number(row.active)?'Active':'Inactive'} · ${row.site_id||'All workplaces'} · ${row.role_scope||'All permitted staff roles'}`;const actions=document.createElement('div');actions.className='vv-action-toolbar';actions.append(button('Edit category',()=>edit(row,data),'edit'));section.append(title,detail,actions);target.append(section);}
       const meta=document.createElement('p');meta.textContent=`${data.total} categories · Page ${data.page} of ${data.pages}`;target.append(meta);
-      if(data.page>1)target.append(button('Previous',()=>openWorkCategorySettings(data.page-1,search)));
-      if(data.page<data.pages)target.append(button('Next',()=>openWorkCategorySettings(data.page+1,search)));
-    } catch(error){if(turn!==epoch||body()!==target)return;target.textContent=error.message;target.append(button('Retry',()=>openWorkCategorySettings(page,search)));}
+      const pages=document.createElement('div');pages.className='vv-action-toolbar';
+      if(data.page>1)pages.append(button('Previous',()=>openWorkCategorySettings(data.page-1,search),'previous'));
+      if(data.page<data.pages)pages.append(button('Next',()=>openWorkCategorySettings(data.page+1,search),'next'));
+      if(data.page>1||data.page<data.pages)target.append(pages);
+    } catch(error){if(turn!==epoch||body()!==target)return;target.textContent=error.message;target.append(button('Retry',()=>openWorkCategorySettings(page,search),'refresh'));}
   }
   window.openWorkCategorySettings=openWorkCategorySettings;
 })();
