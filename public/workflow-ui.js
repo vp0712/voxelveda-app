@@ -123,9 +123,9 @@
           ${item.summary ? `<span class="workflow-item-summary">${escapeHtml(item.summary)}</span>` : ''}
           ${state.tab === 'approvals' ? `<span class="workflow-due ${overdue ? 'overdue' : ''}">${overdue ? 'Overdue' : 'Due'} ${escapeHtml(displayDate(item.due_at))}</span>` : ''}
         </button>
-        <div class="workflow-item-actions">
-          ${actionable && hasPermission('ACTION_APPROVALS') ? `<button type="button" class="primary-btn" data-workflow-action="APPROVE" data-workflow-id="${escapeHtml(item.id)}">Approve</button><button type="button" class="secondary-btn" data-workflow-action="REQUEST_CHANGES" data-workflow-id="${escapeHtml(item.id)}">Changes</button><button type="button" class="danger-btn" data-workflow-action="REJECT" data-workflow-id="${escapeHtml(item.id)}">Reject</button>` : ''}
-          ${cancellable ? `<button type="button" class="secondary-btn" data-workflow-cancel="${escapeHtml(item.id)}">Cancel request</button>` : ''}
+        <div class="workflow-item-actions vv-action-toolbar">
+          ${actionable && hasPermission('ACTION_APPROVALS') ? `<button type="button" class="primary-btn" data-vv-action-icon="approve" data-workflow-action="APPROVE" data-workflow-id="${escapeHtml(item.id)}">Approve</button><button type="button" class="secondary-btn" data-vv-action-icon="correction" data-workflow-action="REQUEST_CHANGES" data-workflow-id="${escapeHtml(item.id)}">Changes</button><button type="button" class="danger-btn" data-vv-action-icon="reject" data-workflow-action="REJECT" data-workflow-id="${escapeHtml(item.id)}">Reject</button>` : ''}
+          ${cancellable ? `<button type="button" class="secondary-btn" data-vv-action-icon="cancel" data-workflow-cancel="${escapeHtml(item.id)}">Cancel request</button>` : ''}
         </div>
       </article>`;
     }).join('');
@@ -216,7 +216,7 @@
           ${instance.summary ? `<p class="workflow-detail-summary">${escapeHtml(instance.summary)}</p>` : ''}
           <h5>Review assignments</h5><ul class="workflow-assignment-list">${assignments || '<li>No reviewer is currently assigned.</li>'}</ul>
           <h5>Action history</h5><ol class="workflow-timeline">${actions || '<li>No actions recorded.</li>'}</ol>
-          ${hasPermission('MANAGE_WORKFLOWS') && isActive(instance.status) ? `<button type="button" class="secondary-btn" data-workflow-reassign="${escapeHtml(instance.id)}">Assign Reviewer</button>` : ''}
+          ${hasPermission('MANAGE_WORKFLOWS') && isActive(instance.status) ? `<button type="button" class="secondary-btn" data-vv-action-icon="edit" data-workflow-reassign="${escapeHtml(instance.id)}">Assign Reviewer</button>` : ''}
         </div>`, hidePortalDialog, 'Close');
       document.querySelector('[data-workflow-reassign]')?.addEventListener('click', () => openReassign(instance.id));
     } catch (error) { toast(error.message, {kind:'error'}); }

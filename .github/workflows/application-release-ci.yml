@@ -80,6 +80,23 @@ jobs:
         run: |
           npm install --prefix "$RUNNER_TEMP/vv-browser" --no-package-lock --ignore-scripts playwright@1.64.0
           "$RUNNER_TEMP/vv-browser/node_modules/.bin/playwright" install --with-deps chromium webkit
+      - name: Verify compact direct actions against the current invoice baseline
+        if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+        run: |
+          mkdir -p "$RUNNER_TEMP/compact-baseline"
+          git archive 7d76c00b5b40f4e935b589e1d679567df47fdc3e | tar -x -C "$RUNNER_TEMP/compact-baseline"
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/compact-baseline/node_modules"
+          VV_COMPACT_PHASE=before VV_COMPACT_SOURCE_ROOT="$RUNNER_TEMP/compact-baseline" VV_COMPACT_SOURCE_COMMIT=7d76c00b5b40f4e935b589e1d679567df47fdc3e UI_PROOF_DIR="$RUNNER_TEMP/compact-action-proof/before" timeout --signal=TERM --kill-after=10s 180s node scripts/compact-action-browser-test.js
+          VV_COMPACT_PHASE=after VV_COMPACT_SOURCE_COMMIT="$GITHUB_SHA" VV_COMPACT_BEFORE_PROOF="$RUNNER_TEMP/compact-action-proof/before/compact-actions.json" UI_PROOF_DIR="$RUNNER_TEMP/compact-action-proof/after" timeout --signal=TERM --kill-after=10s 180s node scripts/compact-action-browser-test.js
+      - name: Preserve compact-action before and after evidence
+        if: ${{ always() && steps.browser-tools.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: compact-actions-${{ github.sha }}
+          path: ${{ runner.temp }}/compact-action-proof
+          retention-days: 30
       - name: Verify complete HTML timesheets without PDF dependencies in email clients
         if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
         env:

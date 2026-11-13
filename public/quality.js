@@ -11,6 +11,14 @@
  function accountSafe(captured,identity=current.identityEpoch){return identity===current.identityEpoch&&captured===owner()&&captured===current.owner;}
  function show(value){out.textContent=typeof value==='string'?value:JSON.stringify(value,null,2);}
  function node(tag,text){const el=document.createElement(tag);if(text!==undefined)el.textContent=String(text);return el;}
+ function compactAction(button,icon){
+  if(!button)return;
+  const label=button.getAttribute('aria-label')||button.textContent.trim();
+  button.dataset.vvActionIcon=icon;
+  if(label){button.setAttribute('title',label);if(!button.hasAttribute('aria-label'))button.setAttribute('aria-label',label);}
+ }
+ for(const [id,icon] of Object.entries({refreshBtn:'refresh',registerAll:'view',registerRefresh:'refresh',registerPreview:'view',registerDownload:'download',registerPrevious:'previous',registerNext:'next',closeOutput:'close'}))compactAction($(id),icon);
+ document.querySelectorAll('.quality-report-actions,.quality-pagination').forEach(group=>group.classList.add('vv-action-toolbar'));
  async function api(url,opts={}){
   const r=await fetch(url,{credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json',...(opts.headers||{})},...opts});
   const data=await r.json().catch(()=>({message:'The service returned an unreadable response. Retry.'}));
@@ -71,7 +79,7 @@
   $('registerPreview').disabled=false;$('registerDownload').disabled=false;
   const emailTarget=$('registerDownload').parentElement;
   emailTarget.querySelector('[data-quality-email]')?.remove();
-  if(window.VoxelDocumentEmail){const mail=window.VoxelDocumentEmail.button(()=>({type:'qms-register',register:current.name,filters:Object.fromEntries(selection()),...(current.artifact?.sourceHash?{expected_source_hash:current.artifact.sourceHash}:{})}),{label:'Email register'});mail.dataset.qualityEmail='';emailTarget.append(mail);}
+  if(window.VoxelDocumentEmail){const mail=window.VoxelDocumentEmail.button(()=>({type:'qms-register',register:current.name,filters:Object.fromEntries(selection()),...(current.artifact?.sourceHash?{expected_source_hash:current.artifact.sourceHash}:{})}),{label:'Email register'});mail.dataset.qualityEmail='';compactAction(mail,'email');emailTarget.append(mail);}
   // The original output region remains a concise accessible feed for existing portal links.
   show(rows.length?'Loaded '+rows.length+' of '+total+' '+meta.title.toLowerCase()+'. '+String(rows[0][meta.columns[0].key]||''):'No records match this selection.');
  }
@@ -111,7 +119,7 @@
  async function previewReport(){
   try{
    const a=await artifact();let page=1,zoom=1,renderEpoch=0;
-   const html='<div class="quality-pdf-controls"><button id="qualityPdfPrevious" type="button">Previous page</button><span id="qualityPdfPage"></span><button id="qualityPdfNext" type="button">Next page</button><button id="qualityPdfSmaller" type="button" aria-label="Zoom out">−</button><button id="qualityPdfLarger" type="button" aria-label="Zoom in">+</button><button id="qualityPdfFit" type="button">Fit width</button><button id="qualityPdfDownload" type="button">Download PDF</button></div><p id="qualityPdfStatus" role="status"></p><div id="qualityPdfStage" tabindex="0" aria-label="PDF document page"><canvas id="qualityPdfCanvas" aria-label="Rendered PDF page"></canvas></div>';
+   const html='<div class="quality-pdf-controls vv-action-toolbar"><button id="qualityPdfPrevious" data-vv-action-icon="previous" type="button">Previous page</button><span id="qualityPdfPage"></span><button id="qualityPdfNext" data-vv-action-icon="next" type="button">Next page</button><button id="qualityPdfSmaller" data-vv-action-icon="zoom-out" type="button" aria-label="Zoom out">−</button><button id="qualityPdfLarger" data-vv-action-icon="zoom-in" type="button" aria-label="Zoom in">+</button><button id="qualityPdfFit" data-vv-action-icon="fit-width" type="button">Fit width</button><button id="qualityPdfDownload" data-vv-action-icon="download" type="button">Download PDF</button></div><p id="qualityPdfStatus" role="status"></p><div id="qualityPdfStage" tabindex="0" aria-label="PDF document page"><canvas id="qualityPdfCanvas" aria-label="Rendered PDF page"></canvas></div>';
    if(!window.VoxelDialog?.open({id:'quality-report',backdrop:'qualityPdfBackdrop',title:'qualityPdfTitle',body:'qualityPdfBody',primary:'qualityPdfClose',secondary:'qualityPdfCancel',heading:current.metadata.title,mode:'readonly',html,onClosed:()=>{renderEpoch++;current.pdfRender?.cancel?.();current.pdfRender=null;current.onPdfResize=null;}}))throw new Error('Close the current dialog before opening the report.');
    if(window.VoxelDocumentEmail)document.querySelector('.quality-pdf-controls').append(window.VoxelDocumentEmail.button({type:'qms-register',register:current.name,filters:Object.fromEntries(selection()),...(a.sourceHash?{expected_source_hash:a.sourceHash}:{})}));
    async function render(){

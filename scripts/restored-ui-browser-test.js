@@ -280,7 +280,9 @@ async function run() {
     await page.evaluate(()=>window.goSection('invoiceSection'));
     const invoiceRow=page.locator('#invoiceTableBody tr').filter({hasText:'INV-TEST-0091'});
     await invoiceRow.waitFor();
-    await invoiceRow.locator('.record-action-menu summary').click();
+    assert.equal(await invoiceRow.locator('.record-action-menu, summary').count(),0,'invoice actions are directly available without a More disclosure');
+    await invoiceRow.getByRole('button',{name:'Approve',exact:true}).waitFor({state:'visible'});
+    assert.equal(await invoiceRow.getByRole('button',{name:'Approve',exact:true}).getAttribute('data-vv-action-icon'),'approve','the direct approval control retains its semantic icon and accessible name');
     const [approvalResponse]=await Promise.all([
       page.waitForResponse(response=>new URL(response.url()).pathname==='/api/invoice/approve' && response.request().method()==='POST'),
       invoiceRow.getByRole('button',{name:'Approve',exact:true}).click()

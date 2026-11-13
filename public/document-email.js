@@ -147,7 +147,7 @@
     }
   }
   function button(source, options={}) {
-    const el=document.createElement('button');el.type='button';el.className='secondary-btn vv-document-email-button';el.innerHTML=icon+'<span>'+escape(options.label || 'Email PDF')+'</span>';el.setAttribute('aria-label',options.ariaLabel || 'Email this report');el.title=options.ariaLabel || 'Email this report';el.hidden=true;
+    const el=document.createElement('button');el.type='button';el.className='secondary-btn vv-document-email-button';el.dataset.vvActionIcon='email';el.innerHTML=icon+'<span>'+escape(options.label || 'Email PDF')+'</span>';el.setAttribute('aria-label',options.ariaLabel || 'Email this report');el.title=options.ariaLabel || 'Email this report';el.hidden=true;
     const value=()=>typeof source==='function'?source():source;
     void allowed(value()||{}).then(permitted=>{if(permitted)el.hidden=false;});
     el.onclick=()=>{const descriptor=value();if(descriptor)void open(descriptor,options);};return el;
