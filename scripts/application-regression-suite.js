@@ -101,6 +101,8 @@ const checks = [
   'weekly-html-email-transport-test.js',
   'staff-timesheet-pdf-api-test.js',
   'timesheet-workflow-regression-test.js',
+  'automatic-timesheet-finalization-test.js',
+  'timesheet-authorized-edit-test.js',
   'email-legacy-document-queue-test.js',
   'managed-weekly-email-queue-test.js',
   'external-link-safety-test.js'

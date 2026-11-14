@@ -89,7 +89,7 @@ function manualTimeAndSchedule() {
 function schedulerFixture(initial = {}) {
   const state = { staff: [staff(1), staff(2), staff(3), staff(4, { email: null }), staff(5), staff(6, { role: 'manager' })],
     attendance: [worked(1, 1), worked(3, 3, undefined, undefined, undefined, { attendance_status: 'PLANNED' }), worked(33, 3, undefined, undefined, undefined, { attendance_status: 'CANCELLED' }), worked(4, 4), worked(5, 5, undefined, null), worked(6, 6)],
-    deliveries: [], history: [], audits: [], timesheets: [], queues: [], sources: [], htmlSources: [], logs: [], failPdf: false, failRender: false, pdfCalls: 0, beforeQueueMutation: null, ...initial };
+    deliveries: [], history: [], audits: [], activities: [], finalVersions: [], transitions: [], timesheets: [], queues: [], sources: [], htmlSources: [], logs: [], failPdf: false, failRender: false, pdfCalls: 0, beforeQueueMutation: null, ...initial };
   let pending = Promise.resolve();
   async function query(sql, params = [], conn = null) {
     const normalized = sql.replace(/\s+/g, ' ').trim();
@@ -112,7 +112,13 @@ function schedulerFixture(initial = {}) {
     if (/SELECT email_queue_id,status FROM weekly_timesheet_deliveries WHERE id=/.test(normalized)) return [[...state.deliveries.filter((row)=>row.id===params[0]).map(plain)]];
     if (/FROM weekly_timesheets WHERE user_id=/.test(normalized)) return [[...state.timesheets.filter((row) => row.user_id === params[0] && row.week_start === params[1] && row.week_end === params[2]).map(plain)]];
     if (/SELECT user_id,period_start,period_end,version,source_sha256 FROM weekly_timesheet_deliveries/.test(normalized)) return [[...state.deliveries.filter((row) => row.email_queue_id === params[0]).map(plain)]];
-    if (/INSERT INTO weekly_timesheets/.test(normalized)) { state.timesheets.push({ id: state.timesheets.length + 1, user_id: params[0], week_start: params[1], week_end: params[2], total_hours: params[3], status: 'DRAFT' }); return [{ insertId: state.timesheets.length }]; }
+    if (/INSERT INTO weekly_timesheets/.test(normalized)) { state.timesheets.push({ id: state.timesheets.length + 1, user_id: params[0], week_start: params[1], week_end: params[2], total_hours: params[3], status: params[4] || 'DRAFT', version_no:0, approved_by:null, approved_at:null, payroll_status:'NOT_READY' }); return [{ insertId: state.timesheets.length }]; }
+    if (/^SELECT status,locked_at,processed_at,exported_at FROM payroll_ready/.test(normalized)) return [[]];
+    if (/^SELECT id,status,snapshot_json,source_sha256,email_queue_id FROM weekly_timesheet_deliveries/.test(normalized)) return [[...state.deliveries.filter(row=>row.user_id===params[0]&&row.period_start===params[1]&&row.period_end===params[2]).map(plain)]];
+    if (/^SELECT snapshot_json(?:,created_by,reason)? FROM timesheet_versions/.test(normalized)) return [[...state.finalVersions.filter(row=>row.timesheet_id===params[0]&&row.version_no===params[1]&&(!normalized.includes("status='FINAL'")||row.status==='FINAL')).map(plain)]];
+    if (/^INSERT INTO timesheet_versions/.test(normalized)){state.finalVersions.push({timesheet_id:params[0],version_no:params[1],status:params[2],snapshot_json:params[3],reason:params[4],created_by:params[5]});return[{affectedRows:1}];}
+    if (/^UPDATE weekly_timesheets SET status=\?/.test(normalized)){Object.assign(state.timesheets.find(row=>row.id===params[5]),{status:params[0],total_hours:params[1],ordinary_hours:params[2],overtime_hours:params[3],version_no:params[4]});return[{affectedRows:1}];}
+    if (/^INSERT INTO timesheet_approvals/.test(normalized)){state.transitions.push({timesheet_id:params[0],action:params[1],from_status:params[2],to_status:params[3],comments:params[4],acted_by:params[5]});return[{affectedRows:1}];}
     if (/SELECT id,status FROM email_queue WHERE id=/.test(normalized)) return [[...state.queues.filter((row)=>row.id===params[0]).map(plain)]];
     if (/SELECT id,status FROM email_queue/.test(normalized)) return [[...state.queues.filter((row) => row.related_record_id === params[0]).map(plain)]];
     if (/INSERT INTO weekly_timesheet_delivery_versions/.test(normalized)) { const existing=state.history.find((row)=>row.delivery_id===params[0]&&row.version===params[1]);if(existing&&existing.source_sha256===params[6]&&(!existing.email_queue_id||existing.email_queue_id===params[9])){existing.status=params[11];existing.email_queue_id=existing.email_queue_id||params[9];existing.document_request_id=existing.document_request_id||params[10];existing.content_sha256=existing.content_sha256||params[15]||null;existing.content_snapshot_json=existing.content_snapshot_json||params[16]||null;}if(!existing)state.history.push({delivery_id:params[0],version:params[1],user_id:params[2],period_start:params[3],period_end:params[4],recipient:params[5],source_sha256:params[6],snapshot_json:params[7],total_minutes:params[8],email_queue_id:params[9],document_request_id:params[10],status:params[11],created_by:params[12],reason:params[13],delivery_format:params[14]||'PDF',content_sha256:params[15]||null,content_snapshot_json:params[16]||null});return[{affectedRows:1}]; }
@@ -133,8 +139,8 @@ function schedulerFixture(initial = {}) {
   }
   const db = { query: (sql, params) => query(sql, params), async getConnection() {
     let releaseLock, saved, held = false;
-    const conn = { async beginTransaction() { const previous = pending; pending = new Promise((resolve) => { releaseLock = resolve; }); await previous; held = true; saved = plain({ deliveries: state.deliveries, timesheets: state.timesheets, queues: state.queues, history: state.history, audits: state.audits }); },
-      query: (sql, params) => query(sql, params, conn), async commit() { held = false; releaseLock(); }, async rollback() { if (held) { state.deliveries = saved.deliveries; state.timesheets = saved.timesheets; state.queues = saved.queues; state.history=saved.history;state.audits=saved.audits;held = false; releaseLock(); } }, release() { assert(!held); } }; return conn;
+    const conn = { async beginTransaction() { const previous = pending; pending = new Promise((resolve) => { releaseLock = resolve; }); await previous; held = true; saved = plain({ deliveries: state.deliveries, timesheets: state.timesheets, queues: state.queues, history: state.history, audits: state.audits, activities:state.activities, finalVersions:state.finalVersions, transitions:state.transitions }); },
+      query: (sql, params) => query(sql, params, conn), async commit() { held = false; releaseLock(); }, async rollback() { if (held) { state.deliveries = saved.deliveries; state.timesheets = saved.timesheets; state.queues = saved.queues; state.history=saved.history;state.audits=saved.audits;state.activities=saved.activities;state.finalVersions=saved.finalVersions;state.transitions=saved.transitions;held = false; releaseLock(); } }, release() { assert(!held); } }; return conn;
   } };
   const dependencies = { '../config/db': db, luxon: require('luxon'), 'node:crypto': require('node:crypto'),
     './timesheetPdfService': { freezeSnapshot: async (_db,snapshot) => {state.pdfCalls++;return snapshot;}, snapshotArtifact: async () => {state.pdfCalls++;return {fixture:true};} },
@@ -157,13 +163,25 @@ function schedulerFixture(initial = {}) {
         await message.afterQueue(conn, row.id,1000+row.id); await conn.commit(); return { email_queue_id: row.id, request_id:1000+row.id,document_pdf_url:`/api/email/documents/${1000+row.id}/pdf`,generation_status: 'VALIDATED' };
       } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); }
     } } };
+  // Exercise the real automatic-final source/version proof inside the scheduler
+  // fixture. Only its explicit company configuration and database are isolated.
+  let schedulerService;
+  const verifiedActual=require('../services/attendanceVerifiedSummaryService');
+  const finalDependencies={...dependencies,'./weeklyTimesheetEligibility':{...policy,configuration:()=>policy.configuration(ENV)},
+    './attendanceVerifiedSummaryService':{...verifiedActual,assessVerifiedAttendance:options=>verifiedActual.assessVerifiedAttendance({...options,env:ENV})},
+    './auditService':{logAudit:async(_db,entry)=>state.audits.push(plain(entry)),logActivity:async(_db,entry)=>state.activities.push(plain(entry))},
+    './weeklyTimesheetScheduler':{loadWorkedAttendance:(...args)=>schedulerService.loadWorkedAttendance(...args)},
+    './workforceSchema':{ensureWorkforceSchema:async()=>{}},'../utils/dateOnly':require('../utils/dateOnly')};
+  const finalModule={exports:{}},finalFile=path.join(__dirname,'../services/timesheetFinalizationService.js');
+  new vm.Script(fs.readFileSync(finalFile,'utf8'),{filename:finalFile}).runInNewContext({module:finalModule,exports:finalModule.exports,Date,process:{env:ENV},console:{warn:(...args)=>state.logs.push(args.join(' '))},require:name=>{if(!Object.hasOwn(finalDependencies,name))throw new Error('Unexpected finalizer dependency '+name);return finalDependencies[name];}});
+  dependencies['./timesheetFinalizationService']=finalModule.exports;
   function reload() {
     const module = { exports: {} };
     const filename = path.join(__dirname, '../services/weeklyTimesheetScheduler.js');
     new vm.Script(fs.readFileSync(filename, 'utf8'), { filename }).runInNewContext({ module, exports: module.exports, Date, console: { log: (...args) => state.logs.push(args.join(' ')) }, process: { env: ENV }, require: (name) => { if (!Object.hasOwn(dependencies, name)) throw new Error('Unexpected dependency: '+name); return dependencies[name]; } });
-    return module.exports;
+    schedulerService=module.exports;return module.exports;
   }
-  return { state, db, reload, service: reload() };
+  return { state, db, reload, finalizer:finalModule.exports, service: reload() };
 }
 async function schedulerSafety() {
   const fixture = schedulerFixture(), { state, service, db } = fixture;
@@ -178,7 +196,7 @@ async function schedulerSafety() {
   assert.equal(state.queues.length, 2, 'concurrent workers must queue one individual HTML report only for worked staff A and worked manager own record');
   assert.deepEqual(state.queues.map((row) => JSON.parse(row.to_json)[0]).sort(), ['registered-1@example.invalid', 'registered-6@example.invalid']);
   for (const row of state.queues) { const savedPolicy=JSON.parse(row.delivery_policy_json);assert.equal(savedPolicy.recipientSource,'REGISTERED_EMAIL');assert.equal(savedPolicy.recipientPolicyVersion,2);assert(!row.to_json.includes('delivery-'),'A distinct legacy designated email is not the selected policy'); }
-  assert(!state.timesheets.some((row) => [2,3,4,5].includes(row.user_id)), 'zero/no-work/missing-recipient/incomplete staff cannot receive a fabricated draft report');
+  assert(!state.timesheets.some((row) => [2,3,5].includes(row.user_id)), 'zero/no-work/incomplete staff cannot receive a fabricated final report');assert.equal(state.timesheets.find(row=>row.user_id===4).status,'FINAL','A missing email blocks delivery, not the truthful final source report');
   assert(state.deliveries.some((row) => row.user_id === 3 && row.status === 'NO_WORK')); assert(state.deliveries.some((row) => row.user_id === 4 && row.status === 'NO_RECIPIENT')); assert(state.deliveries.some((row) => row.user_id === 5 && row.status === 'REVIEW_REQUIRED'));
   assert(!state.deliveries.some((row) => row.user_id === 2), 'no-work staff are not enumerated from all active users');
   for (const row of state.queues) {assert.equal(JSON.parse(row.to_json).length,1);assert.equal(row.cc_json,'[]');assert.equal(row.bcc_json,'[]');assert(!row.html_body.includes('login-only'));const id=Number(row.idempotency_key.split(':')[1]);for(const other of [1,2,3,4,5,6].filter(value=>value!==id))assert(!row.html_body.includes('Fixture employee '+other),'HTML contains only its intended staff member');}
@@ -203,7 +221,7 @@ async function schedulerSafety() {
   state.staff[0].active=0;await assert.rejects(()=>restarted.validateQueuedWeeklyDelivery(queue,db,options),(error)=>error.reasonCode==='STAFF_OR_RECIPIENT_CHANGED');state.staff[0].active=1;
   state.attendance[0].deleted=1;await assert.rejects(()=>restarted.validateQueuedWeeklyDelivery(queue,db,options),(error)=>error.reasonCode==='NO_ELIGIBLE_WORK');state.attendance[0].deleted=0;
   state.attendance[0].notes = 'Explicit corrected note';
-  await assert.rejects(() => restarted.validateQueuedWeeklyDelivery(queue, db, options), (error) => error.reasonCode === 'SOURCE_CHANGED');
+  await assert.rejects(() => restarted.validateQueuedWeeklyDelivery(queue, db, options), (error) => error.reasonCode === 'TIMESHEET_FINALIZATION_UNVERIFIED');
   await restarted.queueClosedWeekTimesheets(options); assert.equal(state.queues.length, 2, 'corrections cannot automatically create another version or email');
   state.attendance[0].notes = '';
   await restarted.markWeeklyDeliveryResult(db, queue, 'SENT', { providerAccepted: true });
@@ -247,10 +265,10 @@ async function schedulerSafety() {
   const frozenLegacy = { ...plain(pdfFailure.state.deliveries[0]), delivery_format:'PDF',content_sha256:null,content_snapshot_json:null,
     status:'GENERATION_FAILED',email_queue_id:null,document_request_id:null,claim_token:null,claim_expires_at:null,generation_attempts:0,next_generation_attempt_at:null };
   const oldPolicyBase=plain(frozenLegacy);
-  const changedFrozen=schedulerFixture({staff:[staff(1,{email:'changed-registered@example.invalid'})],attendance:[worked(1,1)],timesheets:plain(pdfFailure.state.timesheets),deliveries:[plain(frozenLegacy)]});
+  const changedFrozen=schedulerFixture({staff:[staff(1,{email:'changed-registered@example.invalid'})],attendance:[worked(1,1)],timesheets:plain(pdfFailure.state.timesheets),finalVersions:plain(pdfFailure.state.finalVersions),deliveries:[plain(frozenLegacy)]});
   const changedFrozenResult=await changedFrozen.service.queueClosedWeekTimesheets(options);assert.equal(changedFrozenResult.review,1);assert.equal(changedFrozenResult.outcomes[0].reason,'STAFF_OR_RECIPIENT_CHANGED');
   assert.equal(changedFrozen.state.queues.length,0);assert.equal(changedFrozen.state.deliveries[0].recipient,'registered-1@example.invalid','Restart retries never rewrite a frozen recipient after account email change');
-  const legacy = schedulerFixture({staff:[staff(1)],attendance:[worked(1,1)],timesheets:plain(pdfFailure.state.timesheets),deliveries:[frozenLegacy],failPdf:true});
+  const legacy = schedulerFixture({staff:[staff(1)],attendance:[worked(1,1)],timesheets:plain(pdfFailure.state.timesheets),finalVersions:plain(pdfFailure.state.finalVersions),deliveries:[frozenLegacy],failPdf:true});
   assert.equal((await legacy.service.queueClosedWeekTimesheets(options)).failed,1,'An existing frozen PDF report keeps its original format and parser failure');
   assert.equal(legacy.state.deliveries[0].delivery_format,'PDF');assert.equal(legacy.state.queues.length,0);
   const legacySnapshot=legacy.state.deliveries[0].snapshot_json;
@@ -259,7 +277,7 @@ async function schedulerSafety() {
   const originalLegacy=legacy.state.history.find(row=>row.delivery_id===1&&row.version===1);assert.equal(originalLegacy.delivery_format,'PDF');assert.equal(originalLegacy.snapshot_json,legacySnapshot,'The original PDF snapshot/version is retained intact');
   const legacyRecipientSnapshot=JSON.parse(oldPolicyBase.snapshot_json);delete legacyRecipientSnapshot.recipient_source;delete legacyRecipientSnapshot.recipient_policy_version;
   const legacyRecipientRecord={...oldPolicyBase,recipient:'delivery-1@example.invalid',snapshot_json:JSON.stringify(legacyRecipientSnapshot),source_sha256:policy.snapshotHash(legacyRecipientSnapshot)};
-  const oldPolicy=schedulerFixture({staff:[staff(1)],attendance:[worked(1,1)],timesheets:plain(pdfFailure.state.timesheets),deliveries:[legacyRecipientRecord]});
+  const oldPolicy=schedulerFixture({staff:[staff(1)],attendance:[worked(1,1)],timesheets:plain(pdfFailure.state.timesheets),finalVersions:plain(pdfFailure.state.finalVersions),deliveries:[legacyRecipientRecord]});
   await assert.rejects(()=>oldPolicy.service.queueWeeklyTimesheetRevision({...options,deliveryId:1,expectedVersion:1,reason:'Retry rendering only',retryGeneration:true,actor:{id:99,role:'admin'}}),error=>{assert.equal(error.reasonCode,'RECIPIENT_POLICY_CHANGED',error.stack);return true;},'A retry cannot rewrite an old recipient policy');
   const policyHold=await oldPolicy.service.queueClosedWeekTimesheets(options);
   assert.equal(policyHold.review,1);assert.equal(policyHold.outcomes[0].reason,'RECIPIENT_POLICY_CHANGED');assert.equal(oldPolicy.state.queues.length,0);
@@ -328,6 +346,6 @@ async function genuinePdfAndSchema() {
 }
 async function main() {
   pureEligibility();manualTimeAndSchedule(); await schedulerSafety(); await boundedRecovery(); await genuinePdfAndSchema();
-  console.log('Weekly timesheet eligibility tests passed: worked-only A/no-work B/planned C; explicit registered-account recipient only; incomplete/invalid/manual/break review; positive finite minutes and exact saved-hour consistency; no fabricated closures; whole overnight shift/local week boundaries; 167/169-hour DST weeks; duplicate/overlap isolation; Monday bounded latest-week scheduling; staff-period unique claim/atomic queue; concurrent and restarted workers; complete HTML without a PDF; PDF failure cannot block HTML; immutable content and rendering-failure safe retry; stale recipients/data blocked before queue and send; SENT/corrections never auto-resend; genuine PDF/parser identity validation and additive history-preserving schema. Fixtures only; no real staff or transport messages.');
+  console.log('Weekly timesheet eligibility tests passed: genuine automatic FINAL source proof; worked-only A/no-work B/planned C; explicit registered-account recipient only; incomplete/invalid/manual/break review; positive finite minutes and exact saved-hour consistency; no fabricated closures; whole overnight shift/local week boundaries; 167/169-hour DST weeks; duplicate/overlap isolation; Monday bounded latest-week scheduling; staff-period unique claim/atomic queue; concurrent and restarted workers; complete HTML without a PDF; PDF failure cannot block HTML; immutable content and rendering-failure safe retry; stale recipients/data blocked before queue and send; SENT/corrections never auto-resend; genuine PDF/parser identity validation and additive history-preserving schema. Fixtures only; no real staff or transport messages.');
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

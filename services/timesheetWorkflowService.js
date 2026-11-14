@@ -143,10 +143,13 @@ async function listTimesheets({ user, status = 'ALL', userId, fromDate, toDate }
   const params = [];
   const filters = [];
   const normalizedStatus = normalizeStatus(status);
-  if (normalizedStatus !== 'ALL') {
-    filters.push("CASE WHEN UPPER(wt.status) = 'OPEN' THEN 'PENDING_APPROVAL' ELSE UPPER(wt.status) END = ?");
-    params.push(normalizedStatus);
+  if (!hasAnyPermission(user, ['VIEW_OWN_TIMESHEET', 'VIEW_TEAM_TIMESHEET', 'VIEW_ALL_TIMESHEETS'])) {
+    throw new WorkflowError('Timesheet access is not enabled for your account.', 403, 'TIMESHEET_ACCESS_DENIED');
   }
+  // Discover actual worked weeks within the caller's scope; staff never need to
+  // open the application or submit a sheet before reviewers can inspect it.
+  const finalization = require('./timesheetFinalizationService');
+  await finalization.syncVisibleWeeks(user);
   if (hasPermission(user, 'VIEW_ALL_TIMESHEETS')) {
     if (userId) {
       filters.push('wt.user_id = ?');
@@ -178,7 +181,9 @@ async function listTimesheets({ user, status = 'ALL', userId, fromDate, toDate }
     `
     SELECT
       wt.*, u.name, u.email, approver.name AS approved_by_name,
-      pr.status AS payroll_ready_status, pr.gross_estimated_cost
+      u.active AS staff_active,u.role AS staff_role,u.account_status AS staff_account_status,u.deleted_at AS staff_deleted_at,u.employee_number AS staff_employee_number,
+      pr.status AS payroll_ready_status, pr.gross_estimated_cost,
+      pr.locked_at AS payroll_locked_at, pr.processed_at AS payroll_processed_at, pr.exported_at AS payroll_exported_at
     FROM weekly_timesheets wt
     LEFT JOIN users u ON u.id = wt.user_id
     LEFT JOIN users approver ON approver.id = wt.approved_by
@@ -188,7 +193,22 @@ async function listTimesheets({ user, status = 'ALL', userId, fromDate, toDate }
     `,
     params
   );
-  return rows.map((row) => ({ ...row, status: normalizeStatus(row.status) }));
+  const result = [];
+  for (const row of rows) {
+    if (!await canViewTimesheet(user, row)) continue;
+    const eligible = require('./weeklyTimesheetEligibility').activeEmployee({ id: row.user_id, active: row.staff_active,
+      role: row.staff_role, account_status: row.staff_account_status, deleted_at: row.staff_deleted_at, employee_number: row.staff_employee_number });
+    const current = { ...row, lifecycle_status: row.status, account_ineligible: !eligible,
+      historical_saved_hours: Number(row.total_hours || 0), recorded_hours: eligible ? Number(row.total_hours || 0) : null,
+      final_hours: eligible && row.status === 'FINAL' ? Number(row.total_hours || 0) : null,
+      final_minutes: eligible && row.status === 'FINAL' ? Math.round(Number(row.total_hours || 0) * 60) : null };
+    const editable = await require('./timesheetEditService').canEdit(user, current);
+    const locked = ['APPROVED', 'PAYROLL_PROCESSED', 'LOCKED'].includes(String(current.status).toUpperCase()) || ['PROCESSED', 'LOCKED', 'EXPORTED'].includes(String(row.payroll_ready_status || current.payroll_status).toUpperCase()) || Boolean(row.payroll_locked_at || row.payroll_processed_at || row.payroll_exported_at);
+    const item = { ...current, can_edit: editable && !locked, status: String(current.status || 'IN_PROGRESS').toUpperCase(),
+      ...(locked ? { edit_blocker: 'Historical approval or payroll locks must be preserved. Contact an authorised administrator for a controlled historical correction.' } : {}) };
+    if (normalizedStatus === 'ALL' || item.status === normalizedStatus || item.lifecycle_status === normalizedStatus) result.push(item);
+  }
+  return result;
 }
 
 async function getTimesheetDetail(id, user) {
@@ -196,7 +216,8 @@ async function getTimesheetDetail(id, user) {
   await ensureWeeklyTimesheetDeliverySchema();
   const [[timesheet]] = await pool.query(
     `
-    SELECT wt.*, u.name, u.email, approver.name AS approved_by_name
+    SELECT wt.*, u.name, u.email, approver.name AS approved_by_name,
+      u.active AS staff_active,u.role AS staff_role,u.account_status AS staff_account_status,u.deleted_at AS staff_deleted_at,u.employee_number AS staff_employee_number
     FROM weekly_timesheets wt
     LEFT JOIN users u ON u.id = wt.user_id
     LEFT JOIN users approver ON approver.id = wt.approved_by
@@ -208,7 +229,18 @@ async function getTimesheetDetail(id, user) {
   if (!await canViewTimesheet(user, timesheet)) {
     throw new WorkflowError('You do not have access to this timesheet.', 403, 'TIMESHEET_ACCESS_DENIED');
   }
-  const summary = await calculateTimesheet(pool, timesheet);
+  const { dateOnly } = require('../utils/dateOnly');
+  const synchronized = await require('./timesheetFinalizationService').syncWeekTransaction({ userId: timesheet.user_id, weekStart: dateOnly(timesheet.week_start), weekEnd: dateOnly(timesheet.week_end) });
+  const current = { ...timesheet, ...synchronized.timesheet };
+  const summary = synchronized.summary || await calculateTimesheet(pool, current);
+  const editable = await require('./timesheetEditService').canEdit(user, current);
+  const locked = Boolean(current.historical_locked) || ['APPROVED', 'PAYROLL_PROCESSED', 'LOCKED'].includes(String(current.status).toUpperCase()) || ['PROCESSED', 'LOCKED', 'EXPORTED'].includes(String(current.payroll_status).toUpperCase());
+  const attendancePolicy = require('./attendanceMobilePolicy');
+  const displayed = verifiedAttendance.presentAttendance({ ...summary, timezone: summary.company_timezone, reviewIssues: summary.reviewIssues || summary.review_issues || [] });
+  summary.records = displayed.map(row => ({ ...attendancePolicy.publicAttendance(row), allocated_work_date: row.allocated_work_date, can_edit_source: editable && !locked &&
+    !Number(row.deleted) && !['PLANNED', 'SCHEDULED', 'CANCELLED', 'CANCELED', 'REJECTED', 'DUPLICATE', 'DELETED', 'VOID', 'VOIDED'].includes(String(row.attendance_status || row.status || '').toUpperCase()) &&
+    row.allocated_work_date >= dateOnly(current.week_start) && row.allocated_work_date <= dateOnly(current.week_end) }));
+  const [[lastEdit]] = await pool.query('SELECT request_id,created_by,created_at FROM timesheet_edit_receipts WHERE timesheet_id=? ORDER BY version_no DESC,created_at DESC,request_id DESC LIMIT 1', [id]);
   const [versions] = await pool.query(
     'SELECT id, version_no, status, reason, created_by, created_at FROM timesheet_versions WHERE timesheet_id = ? ORDER BY version_no ASC',
     [id]
@@ -222,7 +254,9 @@ async function getTimesheetDetail(id, user) {
     `,
     [id]
   );
-  return { timesheet: { ...timesheet, status: normalizeStatus(timesheet.status) }, summary, versions, approvals };
+  return { timesheet: { ...current, can_edit: editable && !locked, last_edit_request_id: lastEdit?.request_id || null,
+    ...(locked ? { edit_blocker: 'Historical approval or payroll locks must be preserved. Contact an authorised administrator for a controlled historical correction.' } : {}) },
+    summary, versions, approvals, workflow_policy: 'AUTOMATIC_WEEK_FINAL_V1' };
 }
 
 async function submitTimesheet(id, user, req) {

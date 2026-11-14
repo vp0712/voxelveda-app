@@ -186,9 +186,13 @@ exports.weekAttendance = async (req, res) => {
     if(!start||String(requested??start)!==start||weekStartForDate(start)!==start||start>currentStart)return res.status(422).json({message:'Choose a Monday on or before the current reporting week.',code:'TIMESHEET_WEEK_INVALID',fields:{week_start:'Choose a valid Monday'}});
     const end = weekEndForDate(start);
 
-    const data = await getWeekAttendance(userId, start, end);
-
-    const timesheet = await upsertWeeklyTimesheet(userId, start, end, data.totalHours);
+    const synced = await require('../services/timesheetFinalizationService').syncWeekTransaction({ userId, weekStart: start, weekEnd: end });
+    const source = synced.summary;
+    const data = { ...source, totalHours: source.actualHours,
+      rows: require('../services/attendanceVerifiedSummaryService').presentAttendance({
+        ...source, timezone: source.company_timezone, reviewIssues: source.reviewIssues
+      }) };
+    const timesheet = { ...synced.timesheet, can_edit: false };
 
     res.json({
       week_start: start,
@@ -196,15 +200,15 @@ exports.weekAttendance = async (req, res) => {
       current_week_start:currentStart,
       total_hours: data.totalHours,
       verified_total_minutes:data.verified_total_minutes,historical_saved_hours:data.historical_saved_hours,verification_status:data.verification_status,review_required:data.review_required,review_issues:data.review_issues,duplicate_records:data.duplicate_records,
-      attendance: data.rows.map(row=>({...require('../services/attendanceMobilePolicy').publicAttendance(row),allocated_work_date:row.allocated_work_date,total_hours:row.total_hours,total_minutes:row.total_minutes})),
+      attendance: data.rows.map(row=>({...require('../services/attendanceMobilePolicy').publicAttendance(row),allocated_work_date:row.allocated_work_date,total_hours:row.total_hours,total_minutes:row.total_minutes,
+        verified_worked_minutes:row.verified_worked_minutes,verification_status:row.verification_status,review_reasons:row.review_reasons})),
       timesheet, company_timezone: attendanceTime.companyTimezone()
     });
   } catch (err) {
-    console.error('WEEK ATTENDANCE ERROR FULL:', err);
-    res.status(500).json({
-      message: 'Failed to load weekly attendance',
-      error: err.message
-    });
+    const status = Number(err.statusCode || 500);
+    if (status >= 500) console.error('Weekly attendance unavailable:', err.code || err.name);
+    res.status(status).json({ message: status >= 500 ? 'Unable to load this timesheet. Retry after the service recovers.' : err.message,
+      code: err.code || 'TIMESHEET_LOAD_FAILED', ...(status < 500 && err.fields ? { fields: err.fields } : {}) });
   }
 };
 
@@ -305,40 +309,10 @@ exports.allWeeklyTimesheets = async (req, res) => {
   }
 };
 
-exports.updateWeeklyTimesheetStatus = async (req, res) => {
-  try {
-    await ensureAttendanceTables();
-
-    if (!isAdmin(req)) {
-      return res.status(403).json({ message: 'Admin only' });
-    }
-
-    const id = Number(req.body.id);
-    const status = String(req.body.status || '').trim().toLowerCase();
-    const allowed = new Set(['open', 'approved', 'rejected']);
-
-    if (!id || !allowed.has(status)) {
-      return res.status(400).json({ message: 'Valid timesheet and status are required' });
-    }
-
-    const [result] = await pool.query(
-      `UPDATE weekly_timesheets SET status = ? WHERE id = ?`,
-      [status, id]
-    );
-
-    if (!result.affectedRows) {
-      return res.status(404).json({ message: 'Timesheet not found' });
-    }
-
-    res.json({ message: 'Timesheet status updated', status });
-  } catch (err) {
-    console.error('UPDATE WEEKLY TIMESHEET STATUS ERROR FULL:', err);
-    res.status(500).json({
-      message: 'Failed to update timesheet status',
-      error: err.message
-    });
-  }
-};
+// Retained export for older callers, with the same retired policy as the routed API.
+exports.updateWeeklyTimesheetStatus = (_req, res) => res.status(410).json({
+  code: 'TIMESHEET_APPROVAL_REMOVED', message: 'Timesheets finalize automatically. Use the authorised source-edit workflow to correct recorded time.'
+});
 function buildShiftQrPayload() { return qr.createSiteToken(); }
 exports.shiftQrToken = async (req,res) => {
   try { if (!isAdmin(req)) return res.status(403).json({message:'Attendance administration is required.'}); res.setHeader('Cache-Control','no-store, max-age=0'); return res.json(buildShiftQrPayload()); }
@@ -562,87 +536,13 @@ async function refreshWeekForDate(userId, dateValue) {
   await upsertWeeklyTimesheet(userId, start, end, data.totalHours);
 }
 
-async function upsertWeeklyTimesheet(userId, weekStart, weekEnd, totalHours) {
-  const [existing] = await pool.query(
-    `
-    SELECT id, user_id, week_start, week_end, status, total_hours, ordinary_hours, overtime_hours, approved_hours,
-      payroll_status, submitted_at, approved_at, version_no, manager_comments
-    FROM weekly_timesheets
-    WHERE user_id = ?
-    AND week_start = ?
-    AND week_end = ?
-    LIMIT 1
-    `,
-    [userId, weekStart, weekEnd]
-  );
-
-  if (existing.length) {
-    const record = existing[0];
-    const status = String(record.status || 'DRAFT').trim().toUpperCase();
-    if (['DRAFT', 'CORRECTION_REQUIRED'].includes(status)) {
-      const standardHours = Number(process.env.STANDARD_WEEKLY_HOURS || 38);
-      await pool.query(
-        `
-        UPDATE weekly_timesheets
-        SET total_hours = ?, ordinary_hours = ?, overtime_hours = ?
-        WHERE id = ? AND status IN ('DRAFT','CORRECTION_REQUIRED') AND version_no = ?
-        `,
-        [
-          totalHours,
-          Math.min(Number(totalHours || 0), standardHours),
-          Math.max(0, Number(totalHours || 0) - standardHours),
-          record.id, record.version_no
-        ]
-      );
-      record.total_hours = totalHours;
-      record.ordinary_hours = Math.min(Number(totalHours || 0), standardHours);
-      record.overtime_hours = Math.max(0, Number(totalHours || 0) - standardHours);
-      const [[saved]]=await pool.query('SELECT id,user_id,week_start,week_end,status,total_hours,ordinary_hours,overtime_hours,approved_hours,payroll_status,submitted_at,approved_at,version_no,manager_comments FROM weekly_timesheets WHERE id=?',[record.id]);
-      if(saved)return {...saved,status:String(saved.status||'DRAFT').trim().toUpperCase()};
-    }
-    record.status = status;
-    return record;
-  }
-
-  const standardHours = Number(process.env.STANDARD_WEEKLY_HOURS || 38);
-  let result;
-  try { [result] = await pool.query(
-    `
-    INSERT INTO weekly_timesheets
-    (user_id, week_start, week_end, total_hours, ordinary_hours, overtime_hours, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    `,
-    [
-      userId,
-      weekStart,
-      weekEnd,
-      totalHours,
-      Math.min(Number(totalHours || 0), standardHours),
-      Math.max(0, Number(totalHours || 0) - standardHours),
-      'DRAFT'
-    ]
-  );
-  } catch(error) {
-    // Both staff home and My timesheets may first read a week simultaneously.
-    // The existing unique staff/week key wins; never overwrite the winner.
-    if(error.code!=='ER_DUP_ENTRY')throw error;
-    const [[saved]]=await pool.query('SELECT id,user_id,week_start,week_end,status,total_hours,ordinary_hours,overtime_hours,approved_hours,payroll_status,submitted_at,approved_at,version_no,manager_comments FROM weekly_timesheets WHERE user_id=? AND week_start=? AND week_end=?',[userId,weekStart,weekEnd]);
-    if(!saved)throw error;
-    return {...saved,status:String(saved.status||'DRAFT').trim().toUpperCase()};
-  }
-  return {
-    id: result.insertId,
-    user_id: userId,
-    week_start: weekStart,
-    week_end: weekEnd,
-    total_hours: totalHours,
-    ordinary_hours: Math.min(Number(totalHours || 0), standardHours),
-    overtime_hours: Math.max(0, Number(totalHours || 0) - standardHours),
-    approved_hours: 0,
-    status: 'DRAFT',
-    payroll_status: 'NOT_READY',
-    version_no: 0
-  };
+async function upsertWeeklyTimesheet(userId, weekStart, weekEnd, _historicalTotalHours) {
+  // Recalculate from the same authoritative shifts used by the weekly worker.
+  // Never accept a screen-supplied total as a final value or an approval.
+  const result = await require('../services/timesheetFinalizationService').syncWeekTransaction({
+    userId, weekStart, weekEnd
+  });
+  return { ...result.timesheet, can_edit: false };
 }
 
 // Compatibility export delegates to the same controlled, single-recipient

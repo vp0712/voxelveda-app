@@ -27,15 +27,16 @@ exports.download = async (req, res) => {
     await conn.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
     await conn.beginTransaction();
     if (!await canAccessUserRecord(req.user, userId, { own: 'VIEW_OWN_TIMESHEET', team: 'VIEW_TEAM_TIMESHEET', all: 'VIEW_ALL_TIMESHEETS', connection: conn })) throw error('This employee timesheet is outside your current access.', 'PERMISSION_DENIED', 403);
-    const staff = await weekly.loadDocumentStaff(conn, userId);
+    const staff = await weekly.loadDocumentStaff(conn, userId, true);
     if (!staff) throw error('Employee not found.', 'TIMESHEET_STAFF_NOT_FOUND', 404);
+    await require('../services/timesheetFinalizationService').syncWeek({ db: conn, userId, weekStart: period.start, weekEnd: period.end, now });
     const rows = await weekly.loadWorkedAttendance(conn, userId, period);
     const assessment = policy.assessWorkedAttendance(staff, rows, period, config, now);
     if (assessment.status === 'REVIEW_REQUIRED') throw error('Recorded attendance requires review before a complete timesheet PDF can be generated. Request a correction for the listed entries.', 'ATTENDANCE_REVIEW_REQUIRED', 409, assessment.issues);
     if (assessment.status !== 'ELIGIBLE') throw error('This employee has no eligible recorded worked time in this week.', 'NO_ELIGIBLE_WORK');
     const review = await weekly.loadDocumentReview(conn, userId, period);
     const [[delivery]] = await conn.query('SELECT * FROM weekly_timesheet_deliveries WHERE user_id=? AND period_start=? AND period_end=?', [userId, period.start, period.end]);
-    let snapshot = await weekly.reviewedDocumentSnapshot(conn, staff, assessment, period, Number(delivery?.version || 1), review, config, now.toISOString());
+    let snapshot = await weekly.reviewedDocumentSnapshot(conn, staff, assessment, period, Number(delivery?.version || 1), review, config, now.toISOString(), now);
     let retainedAttachment = null;
     if (delivery?.snapshot_json) {
       let saved;

@@ -62,11 +62,20 @@ async function main() {
   assert.equal(results.reduce((sum, value) => sum + value.applied, 0), RETAINED_MIGRATIONS.length, 'Concurrent replicas apply each registered migration exactly once.');
   assert.equal(results.reduce((sum, value) => sum + value.skipped, 0), RETAINED_MIGRATIONS.length * 2);
   await assertOriginalRegisterSchemas(pool);
-  const migration = discoverMigrations(RETAINED_MIGRATIONS_DIR)[0];
+  const registeredMigrations = discoverMigrations(RETAINED_MIGRATIONS_DIR);
+  const migration = registeredMigrations[0], latestMigration = '20261114_timesheet_edit_receipts';
+  assert.equal(RETAINED_MIGRATIONS.length,5,'This release contains exactly the five reviewed additive migrations.');
+  assert.equal(RETAINED_MIGRATIONS.at(-1),latestMigration);
+  assert(results.every(result=>result.schema_version===latestMigration),'Every concurrent runner reports the actual latest applied schema.');
+  const [allLedger]=await pool.query('SELECT migration_id,checksum_sha256,status,applied_at,started_at,updated_at FROM schema_migrations ORDER BY migration_id');
+  assert.deepEqual(allLedger.map(row=>row.migration_id),[...RETAINED_MIGRATIONS],'Fresh and upgrade ledgers contain every registered migration exactly once.');
+  for(const [index,row]of allLedger.entries()){assert.equal(row.status,'APPLIED');assert.equal(row.checksum_sha256,registeredMigrations[index].checksum_sha256);assert(row.applied_at);}
+  const ledgerDigest=digest(allLedger);
   const [[ledger]] = await pool.query('SELECT migration_id,checksum_sha256,status,applied_at,started_at,updated_at FROM schema_migrations WHERE migration_id=?', [RETAINED_MIGRATIONS[0]]);
   assert.equal(ledger.status, 'APPLIED'); assert.equal(ledger.checksum_sha256, migration.checksum_sha256);
   const repeated = await runRetainedMigrations({ pool, logger: { info() {} } });
   assert.equal(repeated.applied, 0); assert.equal(repeated.skipped, RETAINED_MIGRATIONS.length);
+  assert.equal(repeated.schema_version,latestMigration);
   // Exercise persisted metadata in actual MySQL using a private-object-store
   // adapter fixture. Provider connectivity is verified separately in production.
   // No PDF BLOB, local file, recipient or email queue is involved.
@@ -122,9 +131,29 @@ async function main() {
   assert.equal(digest((await pool.query('SELECT * FROM bank_accounts'))[0]), archived, 'No retired table or historical record is changed');
   const [tables] = await pool.query('SELECT table_name AS table_name FROM information_schema.tables WHERE table_schema=DATABASE()');
   const weeklyTables = ['weekly_timesheet_deliveries','weekly_timesheet_delivery_versions'];
-  const expectedTables = [...Object.keys(TABLES), 'timesheet_pdf_snapshots', 'manual_report_snapshots', 'schema_migrations', 'bank_accounts', ...weeklyTables].sort();
+  const expectedTables = [...Object.keys(TABLES), 'timesheet_pdf_snapshots', 'manual_report_snapshots', 'timesheet_edit_receipts', 'schema_migrations', 'bank_accounts', ...weeklyTables].sort();
   assert.deepEqual(tables.map(table => table.table_name).sort(), expectedTables,
-    'Only the exact original registers, PDF cache, private manual-report metadata, immutable weekly delivery tables, migration ledger and protected retired fixture exist.');
+    'Only the exact original registers, PDF cache, private manual-report metadata, reviewed timesheet edit receipts, immutable weekly delivery tables, migration ledger and protected retired fixture exist.');
+  const [receiptColumns]=await pool.query("SELECT column_name AS column_name,data_type AS data_type,is_nullable AS is_nullable,character_maximum_length AS max_length,character_set_name AS character_set_name,collation_name AS collation_name FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='timesheet_edit_receipts' ORDER BY ordinal_position");
+  assert.deepEqual(receiptColumns.map(column=>column.column_name),['timesheet_id','request_id','payload_sha256','response_json','version_no','created_by','created_at'],'The receipt stores only its reviewed durable request/result/version/actor metadata.');
+  assert(receiptColumns.every(column=>column.is_nullable==='NO'&&!/blob|binary/.test(column.data_type)),'Receipt fields are required metadata, without document BLOB storage.');
+  assert.deepEqual(receiptColumns.map(column=>column.data_type),['int','char','char','longtext','int','int','datetime']);
+  for(const [name,length]of [['request_id',36],['payload_sha256',64]]){const column=receiptColumns.find(item=>item.column_name===name);assert.equal(Number(column.max_length),length);assert.equal(column.character_set_name,'ascii');assert.equal(column.collation_name,'ascii_bin');}
+  const [receiptPrimary]=await pool.query("SELECT column_name AS column_name,non_unique AS non_unique FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='timesheet_edit_receipts' AND index_name='PRIMARY' ORDER BY seq_in_index");
+  assert.deepEqual(receiptPrimary.map(column=>column.column_name),['timesheet_id','request_id'],'Durable retries are uniquely identified by the saved sheet and request UUID.');
+  assert(receiptPrimary.every(column=>Number(column.non_unique)===0));
+  const [receiptActor]=await pool.query("SELECT column_name AS column_name FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='timesheet_edit_receipts' AND index_name='idx_timesheet_edit_actor' ORDER BY seq_in_index");
+  assert.deepEqual(receiptActor.map(column=>column.column_name),['created_by','created_at']);
+  const requestId='ea69c23f-603a-49ae-ae07-7798e7ceea61',payloadHash=crypto.createHash('sha256').update('Synthetic immutable correction payload').digest('hex');
+  const receiptBody=JSON.stringify({outcome:'COMMITTED',request_id:requestId,timesheet:{id:901,user_id:902,status:'FINAL',version_no:2,final_hours:7.5},attendance:{id:903,revision:2}});
+  await pool.query('INSERT INTO timesheet_edit_receipts(timesheet_id,request_id,payload_sha256,response_json,version_no,created_by) VALUES(?,?,?,?,?,?)',[901,requestId,payloadHash,receiptBody,2,904]);
+  const [[originalReceipt]]=await pool.query('SELECT * FROM timesheet_edit_receipts WHERE timesheet_id=? AND request_id=?',[901,requestId]);
+  await assert.rejects(pool.query('INSERT INTO timesheet_edit_receipts(timesheet_id,request_id,payload_sha256,response_json,version_no,created_by) VALUES(?,?,?,?,?,?)',[901,requestId,'f'.repeat(64),'changed result must not overwrite',3,905]),error=>error.code==='ER_DUP_ENTRY','Concurrent/replayed request identities cannot create a second receipt or overwrite the first result.');
+  const receiptRestart=await runRetainedMigrations({pool,logger:{info(){}}});assert.equal(receiptRestart.applied,0);assert.equal(receiptRestart.skipped,5);assert.equal(receiptRestart.schema_version,latestMigration);
+  const reopenedReceipt=await pool.getConnection();
+  try{const [[preservedReceipt]]=await reopenedReceipt.query('SELECT * FROM timesheet_edit_receipts WHERE timesheet_id=? AND request_id=?',[901,requestId]);assert.equal(digest(preservedReceipt),digest(originalReceipt),'Fresh/upgrade schema restarts preserve exact receipt identity, payload hash, result bytes, actor, version and creation time.');assert.equal(preservedReceipt.response_json,receiptBody);}finally{reopenedReceipt.release();}
+  const [unchangedLedger]=await pool.query('SELECT migration_id,checksum_sha256,status,applied_at,started_at,updated_at FROM schema_migrations ORDER BY migration_id');assert.equal(digest(unchangedLedger),ledgerDigest,'All five migration checksums and timestamps survive repeat startup unchanged.');
+  assert.equal(digest((await pool.query('SELECT * FROM bank_accounts'))[0]),archived,'Receipt retry/schema verification does not alter retired data.');
   const [manualColumns]=await pool.query("SELECT column_name AS column_name,data_type AS data_type,is_nullable AS is_nullable FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='manual_report_snapshots' ORDER BY ordinal_position");
   assert.deepEqual(manualColumns.map(column=>column.column_name),['id','created_by','source_type','descriptor_json','document_json','authority_sha256','source_sha256','pdf_storage_key','pdf_sha256','pdf_pages','filename','created_at']);
   assert(manualColumns.every(column=>column.is_nullable==='NO'&&!/blob|binary/.test(column.data_type)),'Manual PDFs stay in existing private object storage; SQL stores required immutable metadata only.');
@@ -148,6 +177,6 @@ async function main() {
       if (column.column_name === 'content_sha256') assert.equal(Number(column.max_length), 64);
     }
   }
-  console.log(JSON.stringify({ result: 'passed', fixture_mode: mode, original_tables: Object.keys(TABLES).length, exact_schema_tables: expectedTables.length, weekly_html_metadata_columns: htmlColumns.length, concurrent_runners: 3, applied_once: true, checksummed: true, historical_values_preserved: true, retired_table_unchanged: true }));
+  console.log(JSON.stringify({ result: 'passed', fixture_mode: mode, original_tables: Object.keys(TABLES).length, exact_schema_tables: expectedTables.length, weekly_html_metadata_columns: htmlColumns.length, receipt_primary_columns: receiptPrimary.map(column=>column.column_name), immutable_receipt_preserved: true, applied_schema_version: latestMigration, migration_count: allLedger.length, concurrent_runners: 3, applied_once: true, checksummed: true, historical_values_preserved: true, retired_table_unchanged: true }));
 }
 main().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => pool.end());

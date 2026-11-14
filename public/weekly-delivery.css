@@ -24,3 +24,6 @@
 .weekly-review-filter-panel { flex:1 1 200px; min-width:0; }
 .weekly-review-filter-panel summary { cursor:pointer; min-height:44px; padding:10px; box-sizing:border-box; border:1px solid var(--control-border,#415572); border-radius:8px; }
 .weekly-review-filter-panel[open] .weekly-review-filters { padding-block:12px; }
+
+/* Source-shift corrections reuse the existing managed dialog and navy tokens. */
+.timesheet-source-list{display:grid;gap:12px;margin-block:16px}.timesheet-source-list>article{min-width:0;border:1px solid var(--control-border,#415572);border-radius:10px;padding:14px}.timesheet-source-list h4{margin:0 0 10px}.timesheet-shift-edit-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:12px;margin-block:16px}.timesheet-shift-edit-grid label,#timesheetEditPanel>label{display:grid;gap:6px;min-width:0}#timesheetEditPanel>label{margin-block:12px}.timesheet-status-chip.final,.timesheet-status-chip.in_progress,.timesheet-status-chip.review_required{max-inline-size:100%;white-space:normal;overflow-wrap:anywhere}.timesheet-final-row{background:color-mix(in srgb,var(--surface,#132541) 92%,var(--accent,#2857df))}@media(max-width:600px){.timesheet-shift-edit-grid{grid-template-columns:minmax(0,1fr)}}

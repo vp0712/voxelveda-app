@@ -4,6 +4,7 @@ const path = require('path');
 const {
   activePermissionProjection,
   canAccessUserRecord,
+  canEditTimesheetRecord,
   effectivePermissions,
   hasPermission
 } = require('../services/authorizationService');
@@ -63,6 +64,43 @@ async function runRecordScopeTests() {
   assert.equal(await canAccessUserRecord(user('admin'), 30, {
     ...scope
   }), true);
+
+  // The old delegated reviewer grant and the explicit edit grant have exactly
+  // the same scope, including when a permission boundary uses the other name.
+  for (const [previous, current, allStaff] of [
+    ['APPROVE_TEAM_TIMESHEET', 'EDIT_TEAM_TIMESHEET', false],
+    ['APPROVE_ALL_TIMESHEETS', 'EDIT_ALL_TIMESHEETS', true]
+  ]) {
+    for (const [grant, boundary] of [[previous, current], [current, previous]]) {
+      for (const source of ['permissions', 'temporary_permissions', 'break_glass_permissions']) {
+        const reviewer = { id: 10, role: 'unknown_role', [source]: [grant], permission_boundary: [boundary] };
+        assert(hasPermission(reviewer, previous));
+        assert(hasPermission(reviewer, current));
+        assert.equal(await canEditTimesheetRecord(reviewer, 20, directReportDb), true, source + ' retains an assigned employee');
+        assert.equal(await canEditTimesheetRecord(reviewer, 30, directReportDb), allStaff, source + ' cannot expand a team grant to other employees');
+        assert.equal(await canEditTimesheetRecord(reviewer, 10, directReportDb), false, 'Even delegated all-staff authority cannot edit its own employee timesheet');
+      }
+      const constrained = { id: 10, role: 'unknown_role', permissions: [grant], permission_boundary: ['VIEW_ALL_TIMESHEETS'] };
+      assert.equal(hasPermission(constrained, current), false, 'Read-only boundaries exclude both edit names');
+      assert.equal(hasPermission(constrained, previous), false);
+      assert.equal(await canEditTimesheetRecord(constrained, 20, directReportDb), false);
+    }
+  }
+  for (const permissions of [['VIEW_OWN_TIMESHEET'], ['VIEW_TEAM_TIMESHEET'], ['VIEW_ALL_TIMESHEETS'], ['VIEW_ATTENDANCE']]) {
+    assert.equal(await canEditTimesheetRecord(user('unknown_role', permissions), 20, directReportDb), false, 'Viewing attendance/timesheets never grants editing');
+  }
+  const mismatchedScope = { id: 10, role: 'unknown_role', permissions: ['EDIT_ALL_TIMESHEETS'], permission_boundary: ['APPROVE_TEAM_TIMESHEET'] };
+  assert.equal(await canEditTimesheetRecord(mismatchedScope, 20, directReportDb), false, 'A boundary cannot invent a different scoped grant');
+  assert.equal(await canEditTimesheetRecord(user('staff'), 20, directReportDb), false);
+  assert.equal(await canEditTimesheetRecord(user('admin'), 10, directReportDb), false, 'Administrator role does not bypass the own-employee restriction');
+  for (const value of [0, -1, NaN, 'not-an-employee']) assert.equal(await canEditTimesheetRecord(user('admin'), value, directReportDb), false);
+  for (const id of [undefined, 0, -1, NaN]) assert.equal(await canEditTimesheetRecord({ role: 'super_admin', id }, 20, directReportDb), false, 'A role name cannot replace an authenticated actor identity');
+  let reportsToActor = true;
+  const changedTeam = { async query() { return [reportsToActor ? [{ id: 20 }] : []]; } };
+  const teamEditor = user('unknown_role', ['EDIT_TEAM_TIMESHEET']);
+  assert.equal(await canEditTimesheetRecord(teamEditor, 20, changedTeam), true);
+  reportsToActor = false;
+  assert.equal(await canEditTimesheetRecord(teamEditor, 20, changedTeam), false, 'Authority is re-evaluated after team reassignment');
 }
 
 runRecordScopeTests()

@@ -8,6 +8,14 @@ const renderer = require('../services/weeklyTimesheetEmailService');
 const eligibility = require('../services/weeklyTimesheetEligibility');
 
 function fixtureSnapshot(kind = 'single') {
+  if (kind === 'final') return { ...fixtureSnapshot(), review_status: 'FINAL', finalization_verified: true,
+    finalization_policy: 'AUTOMATIC_WEEK_FINAL_V1', review_version: 1 };
+  if (kind === 'final-corrected') {
+    const source = fixtureSnapshot('adjusted');
+    return { ...source, review_status: 'FINAL', approval_verified: false, approved_hours: undefined,
+      finalization_verified: true, finalization_policy: 'AUTOMATIC_WEEK_FINAL_V1', review_version: 3,
+      total_minutes: 450, rows: source.rows.map(row => ({ ...row, clock_out: '2026-10-02T06:00:00+10:00', total_minutes: 450, total_hours: 7.5 })) };
+  }
   const common = { staff_id: 31, staff_name: 'Fixture Staff A', employee_reference: 'FIXTURE-A', period_start: '2026-09-28', period_end: '2026-10-04',
     timezone: 'Australia/Sydney', version: 1, generated_at: '2026-10-04T20:00:00.000Z', review_status: 'DRAFT', approval_verified: false };
   const row = { id: 901, user_id: 31, name: common.staff_name, work_date: '2026-10-01', clock_in: '2026-10-01T22:00:00+10:00', clock_out: '2026-10-02T06:30:00+10:00',
@@ -59,6 +67,21 @@ function main() {
   assert.match(report.html, /scope="col"/); assert.match(report.html, /class="mobile-label"/);
   assert.doesNotMatch(report.html, /<script|<iframe|<form|cid:|data:image|\.tmp|PDF is attached|PDF attached|page \d+ of|Staff B|FIXTURE-B/i);
   assert.equal(Object.hasOwn(report, 'attachments'), false, 'HTML weekly report has no implicit attachment');
+  const finalSource = fixtureSnapshot('final'), finalSourceBytes = JSON.stringify(finalSource);
+  const final = renderer.renderWeeklyTimesheetEmail(finalSource);
+  assert.equal(JSON.stringify(finalSource), finalSourceBytes, 'Automatic finalization proof and source remain immutable');
+  assert.deepEqual(renderer.renderWeeklyTimesheetEmail(finalSource), final, 'A final source version renders deterministic bytes');
+  for (const body of [final.html, final.text]) {
+    assert.match(body, /Final — no approval required/);
+    assert.match(body, /16\.00 \(16h 00m\)/);
+    assert.doesNotMatch(body, /Provisional|Pending approval|Approved hours|Approved by/);
+  }
+  assert.equal(Object.hasOwn(final, 'attachments'), false, 'Final weekly delivery remains HTML-only without any PDF dependency');
+  const finalCorrection = renderer.renderWeeklyTimesheetEmail(fixtureSnapshot('final-corrected'));
+  assert.match(finalCorrection.text, /Report version: 2/);
+  assert.match(finalCorrection.text, /Weekly recorded hours: 7\.50 \(7h 30m\)/, 'An authorised source correction changes actual row and report totals together');
+  assert.match(finalCorrection.text, /Final — no approval required/);
+  assert.doesNotMatch(finalCorrection.text, /Approved hours/);
   const dst = renderer.renderWeeklyTimesheetEmail(fixtureSnapshot('dst'));
   assert.match(dst.text, /01:30 (?:AEST|GMT\+10)/); assert.match(dst.text, /03:30 (?:AEDT|GMT\+11)/); assert.match(dst.text, /1.00 \(1h 00m\)/); assert.match(dst.text, /Break: 0 min/);
   const adjusted = renderer.renderWeeklyTimesheetEmail(fixtureSnapshot('adjusted'));
@@ -76,6 +99,11 @@ function main() {
     assert.equal((value.text.match(/Shift date:/g) || []).length, 7, 'Every authoritative source shift remains in the report');
     assert.match(value.text, /Timesheet status: Provisional — Draft/);
     assert.doesNotMatch(value.text, /Approved hours:/, 'Recorded calendar duration never fabricates payroll approval');
+    const finalCalendar = renderer.renderWeeklyTimesheetEmail({ ...calendar, review_status: 'FINAL', finalization_verified: true,
+      finalization_policy: 'AUTOMATIC_WEEK_FINAL_V1', review_version: 1 });
+    assert.match(finalCalendar.text, /Final — no approval required/);
+    assert(finalCalendar.text.includes(`Weekly recorded hours: ${expectedHours.toFixed(2)} (${expectedHours}h 00m)`));
+    assert.doesNotMatch(finalCalendar.text, /Approved hours:/, 'Final recorded DST hours do not invent an approval or impose its historical ceiling');
   }
   const fallBack = eligibleCalendarWeek('2026-03-30');
   assert.throws(() => renderer.renderWeeklyTimesheetEmail({ ...fallBack, review_status: 'APPROVED', approval_verified: true }),
@@ -90,6 +118,14 @@ function main() {
   invalid(s => ({ ...s, total_minutes: 0 })); invalid(s => ({ ...s, total_minutes: 100 })); invalid(s => ({ ...s, period_start: '2026-09-29' }));
   invalid(s => ({ ...s, generated_at: '2026-10-01T00:00:00Z' })); invalid(s => ({ ...s, generated_at: '2026-10-05T07:00:00' }));
   invalid(s => ({ ...s, review_status: 'APPROVED' })); invalid(s => ({ ...s, approved_hours: 12 }));
+  for (const patch of [{ finalization_verified: false }, { finalization_policy: 'UNVERIFIED' }, { review_version: 0 },
+    { review_version: '1' }, { approval_verified: true }, { approved_hours: 16 }]) {
+    assert.throws(() => renderer.renderWeeklyTimesheetEmail({ ...finalSource, ...patch }), { code: 'WEEKLY_HTML_FINALIZATION_INVALID' });
+  }
+  for (const status of ['IN_PROGRESS', 'REVIEW_REQUIRED']) {
+    assert.throws(() => renderer.renderWeeklyTimesheetEmail({ ...source, review_status: status }),
+      { code: 'WEEKLY_HTML_ATTENDANCE_REVIEW_REQUIRED' }, 'Open/review-required weeks cannot be mailed as a final report');
+  }
   invalid(s => ({ ...s, rows: [{ ...s.rows[0], user_id: 32 }] })); invalid(s => ({ ...s, rows: [{ ...s.rows[0], name: 'Staff B' }] }));
   invalid(s => ({ ...s, rows: [s.rows[0], s.rows[0]] })); invalid(s => ({ ...s, rows: [{ ...s.rows[0], clock_out: null }] }));
   invalid(s => ({ ...s, rows: [{ ...s.rows[0], attendance_status: 'CANCELLED' }] })); invalid(s => ({ ...s, rows: [{ ...s.rows[0], review_required: 1 }] }));
@@ -107,17 +143,18 @@ function main() {
     pdf.createDocumentPdf = () => { throw new Error('Synthetic PDF generation failure'); };
     pdf.validatePdf = () => { throw new Error('Synthetic parser failure'); };
     assert.deepEqual(renderer.renderWeeklyTimesheetEmail(source), report, 'PDF generation/parser failure never blocks an HTML report');
+    assert.deepEqual(renderer.renderWeeklyTimesheetEmail(finalSource), final, 'PDF generation/parser failure never blocks a final HTML report');
   } finally { pdf.createDocumentPdf = oldGenerate; pdf.validatePdf = oldValidate; }
   const output = process.env.WEEKLY_HTML_PROOF_DIR || '/tmp/voxel-weekly-html-evidence'; fs.mkdirSync(output, { recursive: true });
   fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify(report, null, 2));
   const artifacts = [];
-  for (const kind of ['single', 'dst', 'adjusted', 'long']) {
+  for (const kind of ['single', 'dst', 'adjusted', 'long', 'final', 'final-corrected']) {
     const value = renderer.renderWeeklyTimesheetEmail(fixtureSnapshot(kind));
     fs.writeFileSync(path.join(output, kind + '.html'), value.html); fs.writeFileSync(path.join(output, kind + '.txt'), value.text);
     artifacts.push({ kind, contentHash: value.contentHash, layoutVersion: value.layoutVersion, htmlBytes: Buffer.byteLength(value.html), textBytes: Buffer.byteLength(value.text) });
   }
   fs.writeFileSync(path.join(output, 'verification.json'), JSON.stringify({ result: 'passed', scope: 'Synthetic individual worked-time fixtures; no email sent', pdfGenerationRequired: false, artifacts }, null, 2));
-  console.log('Weekly HTML timesheet tests passed: immutable deterministic body/text, worked-only identity, all rows/totals, overnight/DST including authoritative 167/169-hour weeks and whole-shift boundary allocation, recorded/zero/missing breaks, separate approval policy, actual review/adjustment status, escaped inputs, tamper/size checks and PDF-independent rendering. No real email sent.');
+  console.log('Weekly HTML timesheet tests passed: immutable deterministic body/text, verified automatic FINAL without approval, corrected source totals, worked-only identity, all rows/totals, overnight/DST including authoritative 167/169-hour weeks and whole-shift boundary allocation, recorded/zero/missing breaks, preserved historical approvals, escaped inputs, tamper/size checks and PDF-independent final rendering. No real email sent.');
 }
 if (require.main === module) { try { main(); } catch (error) { console.error(error); process.exitCode = 1; } }
 module.exports = { fixtureSnapshot };

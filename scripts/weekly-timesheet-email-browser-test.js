@@ -14,7 +14,7 @@ const engine = process.env.VV_EMAIL_BROWSER_ENGINE || 'chromium';
 assert(['chromium', 'webkit'].includes(engine), 'Choose a supported email proof browser.');
 const output = process.env.UI_PROOF_DIR || '/tmp/voxel-weekly-html-browser-evidence';
 fs.mkdirSync(output, { recursive: true });
-const reports = new Map(['single', 'dst', 'adjusted', 'long'].map(kind => [kind, renderWeeklyTimesheetEmail(fixtureSnapshot(kind))]));
+const reports = new Map(['single', 'dst', 'adjusted', 'long', 'final', 'final-corrected'].map(kind => [kind, renderWeeklyTimesheetEmail(fixtureSnapshot(kind))]));
 const logo = fs.readFileSync(path.join(__dirname, '../public/logo.png'));
 assert.equal(crypto.createHash('sha256').update(logo).digest('hex'), 'ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312', 'Original logo bytes remain unchanged');
 const server = http.createServer((request, response) => {
@@ -31,12 +31,12 @@ function contrast(color, background) {
   const proof = { fixtureOnly: true, browser: engine, actualMailboxVerified: false, physicalDevice: false, cases: [] };
   try {
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
-    browser = await browsers[engine].launch({ headless: true, ...(engine === 'chromium' ? { args: ['--no-sandbox'] } : {}) });
+    browser = await browsers[engine].launch({ headless: true, ...(engine === 'chromium' && process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}), ...(engine === 'chromium' ? { args: ['--no-sandbox'] } : {}) });
     for (const mode of ['light', 'dark']) for (const width of [320, 360, 390, 430, 768, 1024, 1440]) for (const kind of reports.keys()) {
       const context = await browser.newContext({ viewport: { width, height: 900 }, colorScheme: mode });
       // The only remote image is fulfilled with the exact retained logo. The
       // second scenario blocks it as an email client may do by default.
-      const blockedImages = kind === 'dst' || kind === 'long';
+      const blockedImages = kind === 'dst' || kind === 'long' || kind === 'final-corrected';
       await context.route('https://app.voxelveda.com/logo.png', route => blockedImages ? route.abort() : route.fulfill({ status: 200, contentType: 'image/png', body: logo }));
       const page = await context.newPage(), errors = []; activePage = page;
       page.on('pageerror', error => errors.push(error.message));
@@ -60,6 +60,7 @@ function contrast(color, background) {
         assert.equal(await page.locator('.shift-head').isVisible(), false, 'Phone email uses labelled stacked rows');
         assert(await page.locator('.mobile-label').first().isVisible(), 'Phone shift labels remain visible');
       } else assert(await page.locator('.shift-head').isVisible(), 'Desktop email retains the reference table structure');
+      if (kind === 'final' || kind === 'final-corrected') { const text = await page.locator('body').innerText(); assert.match(text, /Timesheet status: Final — no approval required/); assert.doesNotMatch(text, /Provisional|Approved hours|Pending approval|Awaiting approval/i); }
       assert.deepEqual(errors, []);
       if ([390, 1440].includes(width)) await page.screenshot({ path: path.join(output, `${engine}-${kind}-${width}-${mode}.png`), fullPage: true, animations: 'disabled' });
       if (width === 390 && kind === 'single') {

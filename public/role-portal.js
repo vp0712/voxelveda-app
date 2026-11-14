@@ -13,7 +13,7 @@
     },
     hr: {
       label: 'Human Resources', title: 'People & HR Control Centre', subtitle: 'Workforce attendance, payroll readiness, training, approvals and employee administration.',
-      mission: 'People operations overview', status: 'Focus on attendance exceptions, timesheet approvals, training and workforce actions.',
+      mission: 'People operations overview', status: 'Focus on attendance exceptions, timesheet corrections, training and workforce actions.',
       focus: 'Keep workforce records accurate, compliant and actioned.',
       cards: [
         ['People','Workforce Records','Review staff attendance and workforce records.','timesheetSection','attendance'],

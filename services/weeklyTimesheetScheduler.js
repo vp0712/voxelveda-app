@@ -12,7 +12,9 @@ const { hasPermission, canAccessUserRecord } = require('./authorizationService')
 const { logAudit } = require('./auditService');
 const policy = require('./weeklyTimesheetEligibility');
 
-function enabled() { return String(process.env.WEEKLY_TIMESHEET_EMAIL_ENABLED ?? 'true').toLowerCase() !== 'false'; }
+// Finalization runs even if a company deliberately pauses email. The dispatch
+// policy below still respects WEEKLY_TIMESHEET_EMAIL_ENABLED and send windows.
+function enabled() { return true; }
 function safetyError(reason, providerAccepted = false) {
   return Object.assign(new Error('This weekly timesheet requires review before delivery. No message was sent.'), {
     code: 'DELIVERY_REVIEW_REQUIRED', reasonCode: reason, providerAccepted, statusCode: 409
@@ -46,12 +48,14 @@ async function attendanceForPeriod(db, staffId, period, lock = false) {
   return rows;
 }
 async function reviewStatus(db, staffId, period, lock = false) {
-  const [[timesheet]] = await db.query(`SELECT id,status,total_hours,approved_hours,version_no,approved_by,approved_at FROM weekly_timesheets WHERE user_id=? AND week_start=? AND week_end=?${lock ? ' FOR UPDATE' : ''}`, [staffId, period.start, period.end]);
+  const [[timesheet]] = await db.query(`SELECT id,user_id,week_start,week_end,status,total_hours,approved_hours,version_no,approved_by,approved_at FROM weekly_timesheets WHERE user_id=? AND week_start=? AND week_end=?${lock ? ' FOR UPDATE' : ''}`, [staffId, period.start, period.end]);
   return timesheet || { status: 'DRAFT' };
 }
-async function reviewProof(db, review, assessment, config) {
+async function reviewProof(db, review, assessment, config, period, now = new Date()) {
   const status = String(review.status || 'DRAFT').toUpperCase();
   const version = Number(review.version_no || 0);
+  if (status === 'FINAL') return require('./timesheetFinalizationService').verifyFinalization(db, review, assessment,
+    period || require('./timesheetFinalizationService').periodFor(review.week_start, review.week_end, config.timezone), now);
   if (status !== 'APPROVED') return { status, version, verified: false };
   let verified = Number.isSafeInteger(version) && version > 0 && Number(review.approved_by) > 0 && Boolean(review.approved_at) &&
     review.approved_hours!==null && review.approved_hours!==undefined && Number.isFinite(Number(review.approved_hours)) && Number(review.approved_hours)>=0 && Number(review.approved_hours)<=168 &&
@@ -85,11 +89,15 @@ async function reviewProof(db, review, assessment, config) {
   }
   return { status: verified ? 'APPROVED' : 'CORRECTION_REQUIRED', version, verified, approvedHours:verified?Number(review.approved_hours):null };
 }
-async function reviewedSnapshot(db, staff, assessment, period, version, review, config, generatedAt) {
-  const proof = await reviewProof(db, review, assessment, config);
+async function reviewedSnapshot(db, staff, assessment, period, version, review, config, generatedAt, now = new Date()) {
+  const proof = await reviewProof(db, { ...review, user_id: Number(staff.id) }, assessment, config, period, now);
+  if (String(review.status).toUpperCase() === 'FINAL' && !proof.verified) throw safetyError('TIMESHEET_FINALIZATION_UNVERIFIED');
   const snapshot = policy.canonicalSnapshot(staff, assessment, period, version, proof.status);
-  snapshot.review_version = proof.version; snapshot.approval_verified = proof.verified;
-  if(proof.verified&&Math.abs(proof.approvedHours-Math.round(assessment.totalMinutes/60*100)/100)>0.00001)snapshot.approved_hours=proof.approvedHours;
+  snapshot.review_version = proof.version; snapshot.approval_verified = proof.status === 'APPROVED' && proof.verified;
+  if (proof.status === 'FINAL' && proof.verified) {
+    snapshot.finalization_verified = true; snapshot.finalization_policy = proof.policy;
+  }
+  if(proof.status === 'APPROVED' && proof.verified&&Math.abs(proof.approvedHours-Math.round(assessment.totalMinutes/60*100)/100)>0.00001)snapshot.approved_hours=proof.approvedHours;
   if (generatedAt) snapshot.generated_at = generatedAt;
   return snapshot;
 }
@@ -100,7 +108,7 @@ async function currentSnapshot(db, staff, delivery, config, now, lock = false) {
   const assessment = policy.assessWorkedAttendance(staff, attendance, period, config, now);
   if (assessment.status !== 'ELIGIBLE') throw safetyError(assessment.status === 'REVIEW_REQUIRED' ? 'ATTENDANCE_REVIEW_REQUIRED' : 'NO_ELIGIBLE_WORK');
   const review = await reviewStatus(db, staff.id, period, lock);
-  const snapshot = await reviewedSnapshot(db, staff, assessment, period, Number(delivery.version), review, config, frozenSnapshot(delivery).generated_at);
+  const snapshot = await reviewedSnapshot(db, staff, assessment, period, Number(delivery.version), review, config, frozenSnapshot(delivery).generated_at, now);
   return { snapshot, sourceHash: policy.snapshotHash(snapshot), assessment };
 }
 function outcomeLog(outcome, period) {
@@ -166,12 +174,17 @@ async function reserveDelivery(staffId, period, config, now) {
         [assessment.status, JSON.stringify(assessment.issues), delivery.id]);
       await conn.commit(); return { staff_id: staffId, status: assessment.status, duplicates: assessment.duplicates, review_reasons: assessment.issues };
     }
+    let timesheet = await reviewStatus(conn, staffId, period, true);
+    if (!delivery.snapshot_json && !delivery.source_sha256) {
+      const finalized = await require('./timesheetFinalizationService').syncWeek({ db: conn, userId: staffId,
+        weekStart: period.start, weekEnd: period.end, now });
+      timesheet = finalized.timesheet;
+    }
     const recipient = policy.registeredRecipient(staff);
     if (!recipient) {
       await conn.query("UPDATE weekly_timesheet_deliveries SET status='NO_RECIPIENT',review_reasons_json=NULL,last_error_code=NULL,claim_token=NULL,claim_expires_at=NULL WHERE id=?", [delivery.id]);
       await conn.commit(); return { staff_id: staffId, status: 'NO_RECIPIENT', duplicates: assessment.duplicates };
     }
-    let timesheet = await reviewStatus(conn, staffId, period, true);
     if (!timesheet.id) {
       const [created] = await conn.query(`INSERT INTO weekly_timesheets(user_id,week_start,week_end,total_hours,status) VALUES(?,?,?,?,'DRAFT')`,
         [staffId, period.start, period.end, Math.round(assessment.totalMinutes / 60 * 100) / 100]);
@@ -187,7 +200,7 @@ async function reserveDelivery(staffId, period, config, now) {
       await conn.commit(); return { staff_id: staffId, status, existing: true, reason: 'LEGACY_WEEKLY_DELIVERY_REVIEW' };
     }
     let snapshot = await reviewedSnapshot(conn, staff, assessment, period, Number(delivery.version), timesheet, config,
-      delivery.snapshot_json ? frozenSnapshot(delivery).generated_at : now.toISOString());
+      delivery.snapshot_json ? frozenSnapshot(delivery).generated_at : now.toISOString(), now);
     if (!delivery.snapshot_json && deliveryFormat(delivery) === 'PDF') snapshot = await require('./timesheetPdfService').freezeSnapshot(conn, snapshot);
     const sourceHash = policy.snapshotHash(snapshot);
     if (delivery.source_sha256 && delivery.source_sha256 !== sourceHash) {
@@ -341,7 +354,9 @@ function documentDataForSnapshot(snapshot) {
   return timesheetDocumentData({ rows: snapshot.rows, fromDate: snapshot.period_start, toDate: snapshot.period_end,
     staffName: snapshot.staff_name, employeeReference: snapshot.employee_reference, totalHours: snapshot.total_minutes / 60,
     staffId: snapshot.staff_id, totalMinutes: snapshot.total_minutes, status: snapshot.review_status, timezone: snapshot.timezone,
-    version: snapshot.version, generatedAt: snapshot.generated_at, approvedHours:snapshot.approved_hours });
+    version: snapshot.version, generatedAt: snapshot.generated_at, approvedHours:snapshot.approved_hours,
+    finalizationVerified: snapshot.finalization_verified, finalizationPolicy: snapshot.finalization_policy,
+    finalizationVersion: snapshot.review_version });
 }
 
 async function queueClosedWeekTimesheets(options = {}) {
@@ -481,8 +496,13 @@ async function queueWeeklyTimesheetRevision(options = {}) {
     const version = retry ? expectedVersion : expectedVersion + 1;
     const format = retry ? deliveryFormat(delivery) : 'HTML';
     if (!Number.isSafeInteger(version) || version > 2147483647) throw safetyError('REVISION_VERSION_INVALID');
+    if (!retry) {
+      const synchronized = await require('./timesheetFinalizationService').syncWeek({ db: conn, userId: staff.id,
+        weekStart: period.start, weekEnd: period.end, now, actorId: actor.id, reason, allowFrozenRevision: true });
+      review = synchronized.timesheet;
+    }
     const snapshot = await reviewedSnapshot(conn, staff, assessment, period, version, review, config,
-      retry ? frozenSnapshot(delivery).generated_at : now.toISOString());
+      retry ? frozenSnapshot(delivery).generated_at : now.toISOString(), now);
     const hash = policy.snapshotHash(snapshot);
     if (retry && (hash !== delivery.source_sha256 || recipient !== delivery.recipient)) throw safetyError('SOURCE_CHANGED');
     await retainDeliveryVersion(conn, delivery);
@@ -515,11 +535,18 @@ async function queueWeeklyTimesheetRevision(options = {}) {
   }
 }
 async function processScheduledWeeklyTimesheetEmails() {
+  // Bounded to the latest completed company week, including Monday before the
+  // configured send time. No browser visit or employee submission is required.
+  const finalization = await require('./timesheetFinalizationService').finalizeLatestCompletedWeek();
+  const finalizedStates = {};
+  for (const item of finalization.outcomes) finalizedStates[item.status] = (finalizedStates[item.status] || 0) + 1;
+  console.log('Automatic timesheet finalization', JSON.stringify({ policy: 'AUTOMATIC_WEEK_FINAL_V1',
+    periods: finalization.periods, outcomes: finalizedStates }));
   const result = await queueClosedWeekTimesheets();
   await ensureWeeklyTimesheetDeliverySchema();
   try { await require('./weeklyTimesheetReconciliation').logLatestWeek(); }
   catch(error) { console.warn('Weekly reconciliation unavailable', String(error.code || 'RECONCILIATION_FAILED').slice(0,100)); }
-  return result;
+  return { ...result, finalization };
 }
 const scheduler = backgroundJobService.createScheduler({ jobKey: 'weekly_timesheet_email',
   description: 'Queue one complete HTML timesheet for each employee with verified worked attendance in the most recently completed week',

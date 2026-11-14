@@ -6,6 +6,7 @@ function sendWorkflowError(res, error, fallback) {
   return res.status(status).json({
     message: status >= 500 ? fallback : error.message,
     code: error?.code || 'TIMESHEET_WORKFLOW_ERROR',
+    ...(status<500 && error?.fields ? { fields: error.fields } : {}),
     ...(status<500&&Array.isArray(error?.details?.review_issues)?{details:{review_issues:error.details.review_issues.map(issue=>({code:issue.code,attendance_id:issue.attendance_id}))}}:{})
   });
 }
@@ -33,62 +34,20 @@ exports.detail = async (req, res) => {
   }
 };
 
-exports.submit = async (req, res) => {
-  try {
-    const timesheet = await workflow.submitTimesheet(Number(req.params.id), req.user, req);
-    return res.json({ message: 'Timesheet submitted for approval.', timesheet });
-  } catch (error) {
-    return sendWorkflowError(res, error, 'Unable to submit the timesheet.');
-  }
-};
+function approvalRemoved(_req, res) {
+  return res.status(410).json({ code: 'TIMESHEET_APPROVAL_REMOVED', message: 'Routine timesheet submission and approval have been removed. Verified worked time is finalised automatically after the reporting week. Authorised reviewers may correct source shifts through Edit timesheet.' });
+}
+exports.submit = approvalRemoved;
+exports.approve = approvalRemoved;
+exports.reject = approvalRemoved;
+exports.requestCorrection = approvalRemoved;
+exports.amend = approvalRemoved;
 
-exports.approve = async (req, res) => {
+exports.edit = async (req, res) => {
   try {
-    const timesheet = await workflow.approveTimesheet(Number(req.params.id), req.user, {
-      approvedHours: req.body.approved_hours,
-      requireVersion:true,expectedVersion:req.body.expected_version,expectedSourceMinutes:req.body.expected_source_minutes,
-      comments: req.body.comments,
-      reason: req.body.reason
-    }, req);
-    return res.json({ outcome:'COMMITTED', message: 'Timesheet approved and added to Payroll Ready.', timesheet });
-  } catch (error) {
-    return sendWorkflowError(res, error, 'Unable to approve the timesheet.');
-  }
-};
-
-exports.reject = async (req, res) => {
-  try {
-    const timesheet = await workflow.reviewTimesheet(
-      Number(req.params.id), req.user, 'REJECT', req.body.comments, req, {requireVersion:true,expectedVersion:req.body.expected_version}
-    );
-    return res.json({ message: 'Timesheet rejected.', timesheet });
-  } catch (error) {
-    return sendWorkflowError(res, error, 'Unable to reject the timesheet.');
-  }
-};
-
-exports.requestCorrection = async (req, res) => {
-  try {
-    const timesheet = await workflow.reviewTimesheet(
-      Number(req.params.id), req.user, 'REQUEST_CORRECTION', req.body.comments, req, {requireVersion:true,expectedVersion:req.body.expected_version}
-    );
-    return res.json({ message: 'Correction requested from the staff member.', timesheet });
-  } catch (error) {
-    return sendWorkflowError(res, error, 'Unable to request a correction.');
-  }
-};
-
-exports.amend = async (req, res) => {
-  try {
-    const timesheet = await workflow.amendApprovedTimesheet(Number(req.params.id), req.user, {
-      approvedHours: req.body.approved_hours,
-      requireVersion:true,expectedVersion:req.body.expected_version,expectedSourceMinutes:req.body.expected_source_minutes,
-      reason: req.body.reason
-    }, req);
-    return res.json({ message: 'Approved timesheet amended with a new audit version.', timesheet });
-  } catch (error) {
-    return sendWorkflowError(res, error, 'Unable to amend the approved timesheet.');
-  }
+    const result = await require('../services/timesheetEditService').editTimesheet({ id: req.params.id, user: req.user, input: req.body || {}, req });
+    return res.json(result);
+  } catch (error) { return sendWorkflowError(res, error, 'Unable to save the timesheet correction.'); }
 };
 
 exports.payrollReady = async (req, res) => {
@@ -102,33 +61,4 @@ exports.payrollReady = async (req, res) => {
   }
 };
 
-exports.legacyStatus = async (req, res) => {
-  const id = Number(req.body.id);
-  const status = String(req.body.status || '').trim().toUpperCase();
-  try {
-    if (status === 'APPROVED') {
-      const timesheet = await workflow.approveTimesheet(id, req.user, {
-        approvedHours: req.body.approved_hours,
-      requireVersion:true,expectedVersion:req.body.expected_version,expectedSourceMinutes:req.body.expected_source_minutes,
-        comments: req.body.comments,
-        reason: req.body.reason
-      }, req);
-      return res.json({ outcome:'COMMITTED', message: 'Timesheet approved and added to Payroll Ready.', timesheet });
-    }
-    if (status === 'REJECTED') {
-      const timesheet = await workflow.reviewTimesheet(
-        id, req.user, 'REJECT', req.body.comments, req, {requireVersion:true,expectedVersion:req.body.expected_version}
-      );
-      return res.json({ message: 'Timesheet rejected.', timesheet });
-    }
-    if (status === 'CORRECTION_REQUIRED') {
-      const timesheet = await workflow.reviewTimesheet(
-        id, req.user, 'REQUEST_CORRECTION', req.body.comments, req, {requireVersion:true,expectedVersion:req.body.expected_version}
-      );
-      return res.json({ message: 'Correction requested.', timesheet });
-    }
-    return res.status(400).json({ message: 'Use Approve, Reject, or Request Correction for submitted timesheets.' });
-  } catch (error) {
-    return sendWorkflowError(res, error, 'Unable to update the timesheet.');
-  }
-};
+exports.legacyStatus = approvalRemoved;
