@@ -15,7 +15,9 @@ function documentData(snapshot) {
   return timesheetDocumentData({ rows: snapshot.rows, fromDate: snapshot.period_start, toDate: snapshot.period_end,
     staffName: snapshot.staff_name, employeeReference: snapshot.employee_reference, staffId: snapshot.staff_id,
     totalHours: snapshot.total_minutes / 60, totalMinutes: snapshot.total_minutes, status: snapshot.review_status,
-    timezone: snapshot.timezone, version: snapshot.version, generatedAt: snapshot.generated_at, approvedHours: snapshot.approved_hours });
+    timezone: snapshot.timezone, version: snapshot.version, generatedAt: snapshot.generated_at, approvedHours: snapshot.approved_hours,
+    finalizationVerified: snapshot.finalization_verified, finalizationPolicy: snapshot.finalization_policy,
+    finalizationVersion: snapshot.review_version });
 }
 async function freezeSnapshot(db, snapshot) {
   const key = sourceKey(snapshot), data = documentData(snapshot);

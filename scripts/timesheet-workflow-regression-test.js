@@ -72,14 +72,22 @@ async function main(){
   await assert.rejects(()=>workflow.reviewTimesheet(1,admin,action,reason,null,{requireVersion:true,expectedVersion:current-1}),error=>error.code==='TIMESHEET_VERSION_CONFLICT');
   const reviewed=await workflow.reviewTimesheet(1,admin,action,'  '+reason+'  ',null,{requireVersion:true,expectedVersion:current});assert.equal(reviewed.status,status);assert.equal(state.sheet.manager_comments,reason);assert.equal(state.approvals.at(-1).comments,reason);assert.equal(state.versions.at(-1).reason,reason);
  }
- // The compatibility HTTP endpoint must apply the same contract. In particular,
- // it cannot manufacture review reasons or bypass optimistic concurrency.
+ // Old approval APIs are retired while historical service assertions above
+ // continue to protect immutable approval/payroll evidence and legacy audit rules.
  const calls=[],controllerFixture={exports:{}};
- new vm.Script(fs.readFileSync(path.join(__dirname,'../controllers/timesheetWorkflowController.js'),'utf8')).runInNewContext({module:controllerFixture,exports:controllerFixture.exports,console,require(name){assert.equal(name,'../services/timesheetWorkflowService');return{async reviewTimesheet(...args){calls.push(args);return{id:1};},async approveTimesheet(...args){calls.push(args);return{id:1};}};}});
- const res={json(value){this.body=value;return this;},status(value){this.statusCode=value;return this;}};
- for(const status of ['REJECTED','CORRECTION_REQUIRED']){await controllerFixture.exports.legacyStatus({body:{id:1,status,expected_version:7},user:admin},res);const args=calls.at(-1);assert.equal(args[3],undefined);assert.equal(args[5].requireVersion,true);assert.equal(args[5].expectedVersion,7);}
- await controllerFixture.exports.legacyStatus({body:{id:1,status:'APPROVED',expected_version:7,expected_source_minutes:600,reason:'Actual adjustment reason'},user:admin},res);assert.equal(calls.at(-1)[2].reason,'Actual adjustment reason');
+ new vm.Script(fs.readFileSync(path.join(__dirname,'../controllers/timesheetWorkflowController.js'),'utf8')).runInNewContext({module:controllerFixture,exports:controllerFixture.exports,console,require(name){
+  if(name==='../services/timesheetWorkflowService')return{async reviewTimesheet(...args){calls.push(args);return{id:1};},async approveTimesheet(...args){calls.push(args);return{id:1};},async submitTimesheet(...args){calls.push(args);return{id:1};},async amendApprovedTimesheet(...args){calls.push(args);return{id:1};}};
+  if(name==='../services/timesheetEditService')return{editTimesheet(){throw new Error('A retired approval endpoint must not create a source edit.');}};
+  throw new Error('Unexpected controller dependency '+name);
+ }});
+ for(const action of ['submit','approve','reject','requestCorrection','amend','legacyStatus']){
+  const res={json(value){this.body=value;return this;},status(value){this.statusCode=value;return this;}};
+  await controllerFixture.exports[action]({params:{id:1},body:{id:1,status:'APPROVED',expected_version:7,expected_source_minutes:600,reason:'A reason cannot reactivate retired routine approval.'},user:admin},res);
+  assert.equal(res.statusCode,410,action+' is removed from the active automatic-final policy');
+  assert.equal(res.body.code,'TIMESHEET_APPROVAL_REMOVED');
+ }
+ assert.equal(calls.length,0,'Retired submission/decision routes never invoke legacy writes, versions, payroll or notifications.');
  assert(!state.queries.some(sql=>/^(DELETE|DROP|TRUNCATE)/.test(sql)));
- console.log('Timesheet workflow tests passed: no-comment verified approval; explicit adjustment/rejection/correction/amendment reasons retained; no legacy fabricated reasons or version bypass; source-review and stale-source guards; authorised own/team boundaries; consolidated minutes; audit rollback; one concurrent approval/payroll handoff; immutable prior versions. Fixtures only; no staff email or transport.');
+ console.log('Historical timesheet service evidence passed (not an active approval flow): retained no-comment verified approval; explicit adjustment/rejection/correction/amendment reasons retained; retired routine approval APIs perform no writes; historical no-fabricated-reason or version-bypass guards; source-review and stale-source guards; authorised own/team boundaries; consolidated minutes; audit rollback; one concurrent approval/payroll handoff; immutable prior versions. Fixtures only; no staff email or transport.');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

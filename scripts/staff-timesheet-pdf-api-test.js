@@ -80,21 +80,37 @@ async function main() {
   };
   await assert.rejects(pdfs.snapshotArtifact(racingDb,frozen,{content:first.buffer,filename:first.filename,sha256:first.validation.sha256},racingStorage),{code:'TIMESHEET_PDF_SNAPSHOT_INVALID'},'A concurrent different winner cannot replace already retained attachment bytes.');
 
+  // These controller cases start with a genuinely frozen pre-policy DRAFT
+  // delivery, so the automatic policy must preserve its existing source/bytes.
+  // A separate FINAL case below verifies the real completed-week proof.
+  db.deliveries=[{version:1,status:'SENT',delivery_format:'PDF',snapshot_json:JSON.stringify(frozen),source_sha256:policy.snapshotHash(frozen)}];
+  const realFinals=require('../services/timesheetFinalizationService');
+  let reviewMode='LEGACY', finalReview=null, finalProofRecord=null;
+  const proofDb={async query(sql,params){assert.match(sql,/FROM timesheet_versions.*status='FINAL'/);assert.deepEqual(params,[401,1]);return [[finalProofRecord]];}};
+  const finalizer={async syncWeek(input){
+    assert.equal(input.userId,31);assert.equal(input.weekStart,period.start);assert.equal(input.weekEnd,period.end);assert(input.db,'Source synchronization uses the same transaction.');
+    if(reviewMode==='LEGACY'){assert(db.deliveries[0]?.snapshot_json,'A skipped automatic rewrite requires a retained legacy snapshot.');assert.equal(JSON.parse(db.deliveries[0].snapshot_json).review_status,'DRAFT');return {timesheet:{status:'DRAFT',delivery_snapshot_preserved:true}};}
+    const assessed=policy.assessWorkedAttendance(staff,records,period,policy.configuration(),input.now),proof=await realFinals.verifyFinalization(proofDb,finalReview,assessed,weekly.periodBounds(period.start,period.end,period.timezone),input.now);
+    assert.equal(proof.verified,true,'The FINAL controller fixture must verify its actual persisted version/source proof.');return {timesheet:{...finalReview,finalization_policy:proof.policy}};
+  }};
   const weekly={ensureWeeklyTimesheetDeliverySchema:async()=>{},
     periodBounds(start,end,timezone){return {start,end,timezone,startUtc:DateTime.fromISO(start,{zone:timezone}).toUTC().toISO(),endExclusiveUtc:DateTime.fromISO(start,{zone:timezone}).plus({days:7}).toUTC().toISO()};},
     async loadDocumentStaff(_db,id){sourceReads++;return id===31?staff:null;},
     async loadWorkedAttendance(_db,id,p){assert.equal(id,31);assert.equal(p.start,period.start);return records;},
-    async loadDocumentReview(){return {status:'DRAFT'};},
-    async reviewedDocumentSnapshot(_db,employee,worked,p,version,review,_config,generatedAt){return {...policy.canonicalSnapshot(employee,worked,p,version,review.status),review_version:0,approval_verified:false,generated_at:generatedAt};}
+    async loadDocumentReview(){return reviewMode==='FINAL'?{...finalReview}:{status:'DRAFT'};},
+    async reviewedDocumentSnapshot(_db,employee,worked,p,version,review,_config,generatedAt,now=new Date()){
+      if(reviewMode==='FINAL'){const proof=await realFinals.verifyFinalization(proofDb,review,worked,p,now);assert.equal(proof.verified,true);return {...policy.canonicalSnapshot(employee,worked,p,version,'FINAL'),review_version:proof.version,approval_verified:false,finalization_verified:true,finalization_policy:proof.policy,generated_at:generatedAt};}
+      return {...policy.canonicalSnapshot(employee,worked,p,version,review.status),review_version:0,approval_verified:false,generated_at:generatedAt};
+    }
   };
-  const dependencies={'luxon':require('luxon'),'../config/db':db,'../services/authorizationService':{canAccessUserRecord:(user,target,options)=>auth.canAccessUserRecord(user,target,{...options,connection:db})},'../services/weeklyTimesheetScheduler':weekly,'../services/weeklyTimesheetEligibility':policy,'../services/timesheetPdfService':{...pdfs,snapshotArtifact:artifact},'../services/emailQueue':{restoreAttachments:require('../services/emailQueue').restoreAttachments}};
+  const dependencies={'luxon':require('luxon'),'../config/db':db,'../services/authorizationService':{canAccessUserRecord:(user,target,options)=>auth.canAccessUserRecord(user,target,{...options,connection:db})},'../services/weeklyTimesheetScheduler':weekly,'../services/timesheetFinalizationService':finalizer,'../services/weeklyTimesheetEligibility':policy,'../services/timesheetPdfService':{...pdfs,snapshotArtifact:artifact},'../services/emailQueue':{restoreAttachments:require('../services/emailQueue').restoreAttachments}};
   const filename=path.join(__dirname,'../controllers/staffTimesheetPdfController.js'),moduleFixture={exports:{}};
   vm.runInNewContext(fs.readFileSync(filename,'utf8'),{module:moduleFixture,exports:moduleFixture.exports,Date,console,require(name){if(!Object.hasOwn(dependencies,name))throw new Error('Unexpected controller dependency '+name);return dependencies[name];}},{filename});
   async function call(user={id:31,role:'staff'},query={week_start:period.start}) {
     const res={statusCode:200,headers:{},status(code){this.statusCode=code;return this;},set(headers){this.headers=headers;return this;},send(bytes){this.body=bytes;return this;},json(body){this.body=body;return this;}};
     await moduleFixture.exports.download({user,query},res); return res;
   }
-  const own=await call(); assert.equal(own.statusCode,200,'Missing designated email must not block own PDF download.');
+  const own=await call(); assert.equal(own.statusCode,200,'Missing registered email must not block own preserved PDF download.');
   assert.equal(own.headers['Content-Type'],'application/pdf');assert.match(own.headers['Content-Disposition'],/^attachment; filename="[^"\r\n]+\.pdf"$/);
   assert.equal(own.headers['X-Content-Type-Options'],'nosniff');assert(own.body.equals(first.buffer));
   const preview=await call(undefined,{week_start:period.start,disposition:'inline'});assert(preview.body.equals(own.body));assert.match(preview.headers['Content-Disposition'],/^inline;/);
@@ -114,6 +130,21 @@ async function main() {
   assert(htmlPdf.body.equals(first.buffer),'Existing optional PDF bytes are preserved; only its generation timestamp differs from the email.');
   db.deliveries=[{version:1,status:'SENT',delivery_format:'PDF',snapshot_json:JSON.stringify(htmlSource),source_sha256:policy.snapshotHash(htmlSource)}];
   assert.equal((await call()).body.code,'TIMESHEET_PDF_SNAPSHOT_INVALID','Legacy PDF email/app timestamp and byte identity remains strict.');
+  // A new FINAL report uses a parser-validated source/version proof and the
+  // exact same frozen bytes for preview and download, without an email address.
+  reviewMode='FINAL';const finalPeriod=weekly.periodBounds(period.start,period.end,period.timezone),finalNow=new Date(),finalAssessment=policy.assessWorkedAttendance(staff,records,finalPeriod,policy.configuration(),finalNow);
+  finalReview={id:401,user_id:31,week_start:period.start,week_end:period.end,status:'FINAL',version_no:1,total_hours:8};
+  const finalProof={policy:realFinals.FINALIZATION_POLICY,staff_id:31,period_start:period.start,period_end:period.end,timezone:period.timezone,total_minutes:480,rows:finalAssessment.rows,source_sha256:realFinals.sourceHash(31,finalAssessment,finalPeriod),finalized_at:'2026-10-26T01:00:00.000Z'};
+  finalProofRecord={snapshot_json:JSON.stringify({automatic_finalization:finalProof}),created_by:null,reason:null};
+  const verifiedFinal=await realFinals.verifyFinalization(proofDb,finalReview,finalAssessment,finalPeriod,finalNow);assert.equal(verifiedFinal.verified,true);
+  const finalSource={...policy.canonicalSnapshot(staff,finalAssessment,finalPeriod,1,'FINAL'),review_version:verifiedFinal.version,approval_verified:false,finalization_verified:true,finalization_policy:verifiedFinal.policy,generated_at:finalProof.finalized_at};
+  const finalFrozen=await pdfs.freezeSnapshot(db,finalSource);db.deliveries=[{version:1,status:'SENT',delivery_format:'HTML',snapshot_json:JSON.stringify(finalFrozen),source_sha256:policy.snapshotHash(finalFrozen)}];
+  const finalDownload=await call(),finalPreview=await call(undefined,{week_start:period.start,disposition:'inline'});
+  assert.equal(finalDownload.statusCode,200);assert.equal(finalPreview.statusCode,200);assert(finalDownload.body.equals(finalPreview.body));assert.notEqual(pdfs.sourceKey(finalFrozen),pdfs.sourceKey(frozen),'New final status/proof has its own immutable source key.');
+  assert.equal(finalDownload.headers['Content-Type'],'application/pdf');assert.match(finalDownload.headers['Content-Disposition'],/^attachment; filename="[^"\r\n]+\.pdf"$/);assert.match(finalPreview.headers['Content-Disposition'],/^inline;/);
+  assert.equal(finalDownload.headers['X-Document-Version'],'1');assert.equal(finalDownload.headers['X-Document-Source-SHA256'],policy.snapshotHash(finalFrozen));
+  const finalParsed=await validatePdf(finalDownload.body,{expectedText:['Fixture Employee A','FIXTURE-A','Final','19 Oct 2026','25 Oct 2026']});assert.doesNotMatch(finalParsed.text,/Provisional|Approved hours/);assert(first.buffer.equals(await storage.getObject(db.cache.get(pdfs.sourceKey(frozen)).pdf_object_key)),'New final generation preserves the earlier legacy PDF bytes.');
+  reviewMode='LEGACY';
   records=[{...record,notes:'Legitimate source correction after delivery'}];db.deliveries=[{version:1,status:'SENT',snapshot_json:JSON.stringify(frozen),source_sha256:policy.snapshotHash(frozen)}];
   const countBefore=db.cache.size,sourceChanged=await call();assert.equal(sourceChanged.statusCode,409);assert.equal(sourceChanged.body.code,'SOURCE_CHANGED');assert.equal(db.cache.size,countBefore,'Changed accepted reports require explicit authorised revision, no new v1 download.');assert(first.buffer.equals(await storage.getObject(db.cache.get(pdfs.sourceKey(frozen)).pdf_object_key)));
   const stored=db.cache.get(pdfs.sourceKey(frozen));objects.set(stored.pdf_object_key,Buffer.from('<html>HTTP error</html>'));

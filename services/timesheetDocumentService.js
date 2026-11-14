@@ -1,7 +1,7 @@
 "use strict";
 const { DateTime, IANAZone } = require('luxon');
 const { dateLabel, pdfError } = require('./documentPdfService');
-function timesheetDocumentData({ rows, fromDate, toDate, staffName, staffId, employeeReference, totalHours, totalMinutes, status, approvedBy, timezone = process.env.TIMESHEET_TIMEZONE || 'Australia/Sydney', version = 1, generatedAt, approvedHours }) {
+function timesheetDocumentData({ rows, fromDate, toDate, staffName, staffId, employeeReference, totalHours, totalMinutes, status, approvedBy, timezone = process.env.TIMESHEET_TIMEZONE || 'Australia/Sydney', version = 1, generatedAt, approvedHours, finalizationVerified, finalizationPolicy, finalizationVersion }) {
   if (!Array.isArray(rows) || !IANAZone.isValidZone(timezone)) throw pdfError('Timesheet entries or company timezone are unavailable.', 'PDF_DATA_INVALID');
   const staffIds = new Set(rows.filter(row => row.user_id != null).map(row => Number(row.user_id)));
   if (staffIds.size > 1 || (staffId && [...staffIds].some(id => id !== Number(staffId))) || rows.some(row => row.name && staffName && String(row.name) !== String(staffName))) throw pdfError('An individual timesheet must contain only its designated staff member.', 'PDF_STAFF_SCOPE_MISMATCH');
@@ -27,9 +27,23 @@ function timesheetDocumentData({ rows, fromDate, toDate, staffName, staffId, emp
   });
   if ((totalMinutes !== undefined && (!Number.isSafeInteger(Number(totalMinutes)) || Number(totalMinutes) !== recordedMinutes)) || (totalHours !== undefined && (!Number.isFinite(Number(totalHours)) || Math.abs(Number(totalHours) - recordedMinutes / 60) > 0.011))) throw pdfError('Timesheet totals do not match saved attendance for this period.', 'PDF_TOTAL_MISMATCH');
   if (!Number.isSafeInteger(Number(version)) || Number(version) < 1) throw pdfError('The timesheet document version is invalid.', 'PDF_DATA_INVALID');
-  const approved = String(status || '').toUpperCase() === 'APPROVED';
+  const normalizedStatus = String(status || '').toUpperCase();
+  const approved = normalizedStatus === 'APPROVED';
   if(approvedHours!==undefined&&(!approved||!Number.isFinite(Number(approvedHours))||Number(approvedHours)<0||Number(approvedHours)>168))throw pdfError('Approved hours require verified approval evidence.','PDF_APPROVAL_INVALID');
-  const review = approved ? 'Approved' : `Provisional — ${String(status || 'DRAFT').replace(/_/g, ' ')}`;
+  if (normalizedStatus === 'FINAL') {
+    const week = DateTime.fromISO(String(fromDate), { zone: timezone });
+    const issued = typeof generatedAt === 'string' && /(?:Z|[+-]\d{2}:\d{2})$/.test(generatedAt) ? DateTime.fromISO(generatedAt, { setZone: true }) : null;
+    if (finalizationVerified !== true || finalizationPolicy !== 'AUTOMATIC_WEEK_FINAL_V1' ||
+        !Number.isSafeInteger(finalizationVersion) || finalizationVersion < 1 ||
+        !week.isValid || week.weekday !== 1 || week.plus({ days: 6 }).toISODate() !== toDate ||
+        !issued?.isValid || issued < week.plus({ days: 7 }) || approvedBy) {
+      throw pdfError('Final timesheets require a verified completed-week source version.', 'PDF_FINALIZATION_INVALID');
+    }
+  }
+  const review = normalizedStatus === 'FINAL' ? 'Final — no approval required' :
+    normalizedStatus === 'IN_PROGRESS' ? 'In progress — reporting week is open' :
+    normalizedStatus === 'REVIEW_REQUIRED' ? 'Review required — attendance needs correction' :
+    approved ? 'Approved' : `Provisional — ${String(status || 'DRAFT').replace(/_/g, ' ')}`;
   return { title: Number(version) > 1 ? 'TIMESHEET — REVISION' : 'TIMESHEET', reference: `${fromDate} to ${toDate} | Version ${version}`, filename: `timesheet-${employeeReference || staffName || 'staff'}-${fromDate}-${toDate}-v${version}`, issueDate: generatedAt ? DateTime.fromISO(String(generatedAt), { setZone: true }).setZone(timezone).toISODate() : toDate,
     period: `${dateLabel(fromDate)} to ${dateLabel(toDate)} | ${timezone}`, party: `${staffName || 'Staff'}${employeeReference ? ` | Staff reference: ${employeeReference}` : ''}`,
     tables: [{ title: 'Worked shifts', columns: [{ label: 'Shift date', width: 1 }, { label: 'Start', width: 1.5 }, { label: 'End', width: 1.5 }, { label: 'Break', width: .8 }, { label: 'Worked hours', width: 1 }, { label: 'Job / site', width: 1.3 }], rows: shifts },

@@ -64,5 +64,34 @@
       }catch(error){if(owner!==account())return {kind:'account-changed'};const unknown=uncertain.has(key)||error.uncertain;await show({kind:'error',title:unknown?'Outcome needs confirmation':error.status===409?'Review required':error.status===401?'Session expired':'Action could not be completed',message:unknown?'The server may have saved this action. Reconcile the record before trying again.':error.message,actions:unknown?[{label:'Reconcile record',run:config.reopen},{label:'Return to form'}]:error.status===401?[{label:'Log in',run:()=>location.assign('/login?returnTo='+encodeURIComponent(location.pathname+location.search+location.hash))},{label:'Close'}]:config.errorActions});return {kind:unknown?'uncertain':'error',error};}
     })();pending.set(key,run);try{return await run;}finally{pending.delete(key);}
   }
-  window.VoxelActions={request,timesheet,account,committed,date:value=>{const day=String(value||'').slice(0,10);return /^\d{4}-\d{2}-\d{2}$/.test(day)?new Intl.DateTimeFormat('en-AU',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(day+'T12:00:00Z')):'Date unavailable';}};
+  // Source corrections have an explicit durable request receipt. Matching hours
+  // or a newer version alone never proves that this particular edit committed.
+  async function timesheetEdit(config) {
+    const owner=account(),key=owner+'|timesheet-source:'+config.id;
+    if(pending.has(key))return pending.get(key);
+    const confirms=data=>{const row=data?.timesheet;return row&&Number(row.id)===Number(config.id)&&Number.isSafeInteger(Number(row.version_no))&&Number(row.version_no)>Number(config.body.expected_version)&&String(data.request_id||row.last_edit_request_id||'')===String(config.body.request_id)&&(!data.attendance||Number(data.attendance.id)===Number(config.body.attendance_id));};
+    const run=(async()=>{
+      let saved;
+      try {
+        if(config.reconcileOnly){saved=await request('/api/attendance/timesheets/'+Number(config.id),{headers:config.headers});if(!confirms(saved))throw Object.assign(new Error('This request has not been confirmed as saved. Return to the form and retry the same saved request only after reviewing the current source.'),{uncertain:true});}
+        else try{saved=await request(config.url,{method:'POST',headers:config.headers,body:JSON.stringify(config.body)});if(saved?.outcome!=='COMMITTED'||!confirms(saved))throw Object.assign(new Error('The saved correction receipt could not be confirmed.'),{uncertain:true});}
+        catch(error){if(!error.uncertain)throw error;try{const current=await request('/api/attendance/timesheets/'+Number(config.id),{headers:config.headers});if(confirms(current))saved=current;else throw error;}catch{throw error;}}
+        if(owner!==account())return {kind:'account-changed'};
+        const row=saved.timesheet;
+        window.VoxelDialog?.markCommitted?.();config.close?.();
+        let refreshFailed=false;try{config.onCommit?.(row,saved);await config.refresh?.();}catch{refreshFailed=true;}
+        if(owner!==account())return {kind:'account-changed'};
+        const value=saved.summary?.actualHours??row.total_hours??row.final_hours;
+        const total=value!==null&&value!==''&&Number.isFinite(Number(value))?Number(value).toFixed(2)+' recorded hours':null;
+        await show({kind:'success',title:'Timesheet correction saved',message:config.context||'The saved source correction has been confirmed.',items:[...(total?[total]:[]),...((saved.delivery_revision_required||row.delivery_revision_required)?['This source correction is saved. The earlier report is preserved; an authorised labelled revision is required before sending the corrected report. No automatic resend was made.']:[]),...(String(row.lifecycle_status||row.status)==='REVIEW_REQUIRED'?['Other source attendance still requires authorised correction before the week can become final.']:[]),...(refreshFailed?['The correction is saved. The register could not refresh; use Refresh to reload it.']:[])]});
+        return {kind:'success',record:row,refreshFailed};
+      }catch(error){
+        if(owner!==account())return {kind:'account-changed'};
+        const unknown=Boolean(error.uncertain);
+        await show({kind:'error',title:unknown?'Correction outcome needs confirmation':error.status===409?'Source changed':error.status===401?'Session expired':'Correction could not be saved',message:unknown?'The server may have saved this correction. Check the saved request before taking another action. The original request ID is retained.':error.message,actions:unknown?[{label:'Check saved request',run:()=>setTimeout(()=>{void timesheetEdit({...config,reconcileOnly:true});},0)},{label:'Return to form'}]:error.status===401?[{label:'Log in',run:()=>location.assign('/login?returnTo='+encodeURIComponent(location.pathname+location.search+location.hash))},{label:'Return to form'}]:[{label:'Return to form'},...(config.reopen?[{label:'Refresh source',run:config.reopen}]:[])]});
+        return {kind:unknown?'uncertain':'error',error};
+      }
+    })();pending.set(key,run);try{return await run;}finally{pending.delete(key);}
+  }
+  window.VoxelActions={request,timesheet,timesheetEdit,account,committed,date:value=>{const day=String(value||'').slice(0,10);return /^\d{4}-\d{2}-\d{2}$/.test(day)?new Intl.DateTimeFormat('en-AU',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(day+'T12:00:00Z')):'Date unavailable';}};
 })();

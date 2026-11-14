@@ -1,4 +1,9 @@
-const { LEGACY_PERMISSION_MAP, PERMISSIONS, ROLE_TEMPLATES } = require('../config/permissionCatalog');
+const { LEGACY_PERMISSION_MAP, PERMISSIONS, ROLE_TEMPLATES, TIMESHEET_PERMISSION_ALIASES } = require('../config/permissionCatalog');
+
+const timesheetEquivalents = new Map(Object.entries(TIMESHEET_PERMISSION_ALIASES).flatMap(([previous, current]) => [
+  [previous, Object.freeze([current, previous])],
+  [current, Object.freeze([current, previous])]
+]));
 
 function parsePermissions(value) {
   if (Array.isArray(value)) return value;
@@ -9,7 +14,7 @@ function canonicalPermission(value) {
   const raw = String(value || '').trim();
   if (!raw) return [];
   const upper = raw.toUpperCase();
-  if (PERMISSIONS.includes(upper)) return [upper];
+  if (PERMISSIONS.includes(upper)) return timesheetEquivalents.get(upper) || [upper];
   const legacyKey = raw.toLowerCase();
   return Object.hasOwn(LEGACY_PERMISSION_MAP, legacyKey) ? LEGACY_PERMISSION_MAP[legacyKey] : [];
 }
@@ -52,4 +57,14 @@ async function canAccessUserRecord(user, targetUserId, options = {}) {
   return false;
 }
 
-module.exports = { activePermissionProjection, canAccessUserRecord, canonicalPermission, effectivePermissions, hasAnyPermission, hasPermission, isManagerOf, parsePermissions };
+// Employee read access and ordinary clock permissions never authorize an edit.
+// Resolve team membership on the same transaction connection used by the write.
+async function canEditTimesheetRecord(user, targetUserId, connection = null) {
+  const actorId = Number(user?.id), staffId = Number(targetUserId);
+  if (!Number.isSafeInteger(actorId) || actorId < 1 || !Number.isSafeInteger(staffId) || staffId < 1 || actorId === staffId) return false;
+  return canAccessUserRecord(user, staffId, {
+    team: 'EDIT_TEAM_TIMESHEET', all: 'EDIT_ALL_TIMESHEETS', connection
+  });
+}
+
+module.exports = { activePermissionProjection, canAccessUserRecord, canEditTimesheetRecord, canonicalPermission, effectivePermissions, hasAnyPermission, hasPermission, isManagerOf, parsePermissions };

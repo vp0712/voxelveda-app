@@ -985,6 +985,7 @@ async function main() {
   await testAttendanceCorrections();
   await testAttendancePeriodActionGuards();
   await testVerifiedAttendanceTotals();
+  await require('./automatic-timesheet-mysql-fixture')({ pool, assert, facts, response, capturedMessages });
   await testOriginalGoodsReceiptNotifications();
   await testMixedCollationNotificationOwnership();
   await testArchivedRetention();
@@ -1495,6 +1496,10 @@ async function testVerifiedAttendanceTotals() {
     const detail = await workflow.getTimesheetDetail(sheet.insertId, user);
     assert.equal(detail.summary.actualHours, 1); assert.equal(detail.summary.historical_saved_hours, 11);
     assert.equal(detail.summary.reviewRequired, true); assert.equal(detail.summary.duplicate_records, 1);
+    assert.equal(week.body.timesheet.approval_required,false);assert.equal(week.body.timesheet.source_review_required,true);assert.notEqual(week.body.timesheet.status,'FINAL','Unverified source cannot be finalized by removing routine approval.');
+    // Exercise retained historical service evidence explicitly; active approval
+    // endpoints below are retired and never call this legacy path.
+    await pool.query("UPDATE weekly_timesheets SET status='DRAFT' WHERE id=?",[sheet.insertId]);
     const beforeSubmit = await snapshot();
     await assert.rejects(() => workflow.submitTimesheet(sheet.insertId, user, req), { code: 'TIMESHEET_ATTENDANCE_REVIEW_REQUIRED', statusCode: 409 });
     assert.deepEqual(await snapshot(), beforeSubmit, 'Unverified source time cannot create submitted versions, approvals, payroll or mail.');
@@ -1505,12 +1510,13 @@ async function testVerifiedAttendanceTotals() {
     const rejectedApproval=response();
     const [[pendingSource]]=await pool.query('SELECT version_no FROM weekly_timesheets WHERE id=?',[sheet.insertId]);
     await require('../controllers/timesheetWorkflowController').approve({...req,user:mobileUsers.approver,params:{id:sheet.insertId},body:{approved_hours:10,expected_version:pendingSource.version_no,expected_source_minutes:60,reason:'Synthetic attempt cannot resolve unverified attendance'}},rejectedApproval);
-    assert.equal(rejectedApproval.statusCode,409);assert.equal(rejectedApproval.body.code,'TIMESHEET_ATTENDANCE_REVIEW_REQUIRED');assert.match(rejectedApproval.body.message,/submitted or approved/);assert(rejectedApproval.body.details.review_issues.length>0);
-    assert.deepEqual(await snapshot(),beforeApprove,'The exact HTTP409 cannot commit an approval, version, payroll or mail even with entered hours and a reason.');
+    assert.equal(rejectedApproval.statusCode,410);assert.equal(rejectedApproval.body.code,'TIMESHEET_APPROVAL_REMOVED');
+    assert.deepEqual(await snapshot(),beforeApprove,'The retired HTTP410 approval endpoint cannot commit an approval, version, payroll or mail even with entered hours and a reason.');
 
     const originalSnapshot = '{"fixture":"synthetic approved history","hours":77,"preserve":true}';
-    await pool.query("UPDATE weekly_timesheets SET status='APPROVED',total_hours=77,approved_hours=77,ordinary_hours=38,overtime_hours=39,version_no=1 WHERE id=?", [sheet.insertId]);
-    await pool.query("INSERT INTO timesheet_versions(timesheet_id,version_no,status,snapshot_json,created_by) VALUES(?,1,'APPROVED',?,?)", [sheet.insertId, originalSnapshot, mobileUsers.approver.id]);
+    const [[legacyVersion]]=await pool.query('SELECT COALESCE(MAX(version_no),0)+1 next_version FROM timesheet_versions WHERE timesheet_id=?',[sheet.insertId]);
+    await pool.query("UPDATE weekly_timesheets SET status='APPROVED',total_hours=77,approved_hours=77,ordinary_hours=38,overtime_hours=39,version_no=? WHERE id=?", [legacyVersion.next_version,sheet.insertId]);
+    await pool.query("INSERT INTO timesheet_versions(timesheet_id,version_no,status,snapshot_json,created_by) VALUES(?,?,'APPROVED',?,?)", [sheet.insertId,legacyVersion.next_version,originalSnapshot,mobileUsers.approver.id]);
     const beforeApprovedRead = await snapshot();
     const approvedWeek = response(); await controller.weekAttendance(req, approvedWeek);
     assert.equal(approvedWeek.statusCode, 200); assert.equal(approvedWeek.body.total_hours, 1);
@@ -1522,7 +1528,7 @@ async function testVerifiedAttendanceTotals() {
     const futureWeek=response();await controller.weekAttendance({...req,query:{week_start:'2026-10-19'}},futureWeek);assert.equal(futureWeek.statusCode,422);
     const priorReads=await Promise.all([1,2].map(async()=>{const result=response();await controller.weekAttendance({...req,query:{week_start:'2026-10-05',user_id:mobileUsers.other.id}},result);return result;}));
     for(const prior of priorReads){assert.equal(prior.statusCode,200);assert.equal(prior.body.week_start,'2026-10-05');assert.equal(prior.body.week_end,'2026-10-11');assert.equal(Number(prior.body.timesheet.user_id),user.id,'A supplied foreign user ID cannot change the own-week query');assert.equal(prior.body.total_hours,0);}
-    const [[onePrior]]=await pool.query("SELECT COUNT(*) count FROM weekly_timesheets WHERE user_id=? AND week_start='2026-10-05'",[user.id]);assert.equal(Number(onePrior.count),1,'Concurrent first reads keep one durable staff/week identity');
+    const [[onePrior]]=await pool.query("SELECT COUNT(*) count FROM weekly_timesheets WHERE user_id=? AND week_start='2026-10-05'",[user.id]);assert.equal(Number(onePrior.count),0,'Concurrent no-work reads do not fabricate an empty saved timesheet or a delivery.');for(const prior of priorReads){assert.equal(prior.body.timesheet.id,null);assert.equal(prior.body.timesheet.approval_required,false);}
     assert.deepEqual(await raw(), preservedRaw, 'Duplicate, rejected, cancelled and unzoned records remain intact.');
   } finally { Settings.now = originalNow; }
   facts.push('actual current/draft weekly and approval totals exclude duplicate/rejected/cancelled/unverified hours, preserve saved diagnostics and approved historical versions, and block unresolved source review without payroll/mail side effects');

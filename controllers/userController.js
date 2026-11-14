@@ -11,7 +11,7 @@ const { ensureSecuritySchema } = require('../services/securitySchema');
 const { revokeUserSessions, logSecurityEvent } = require('../services/sessionService');
 const { issueToken, revokeUserActionTokens } = require('../services/authActionTokenService');
 const { queueSecurityLink } = require('../services/securityEmailService');
-const { HIGH_RISK_PERMISSIONS, PERMISSIONS, ROLE_TEMPLATES } = require('../config/permissionCatalog');
+const { HIGH_RISK_PERMISSIONS, PERMISSIONS, ROLE_TEMPLATES, TIMESHEET_PERMISSION_ALIASES, TIMESHEET_PERMISSION_LABELS } = require('../config/permissionCatalog');
 const { activePermissionProjection, canonicalPermission, hasPermission } = require('../services/authorizationService');
 const { assertNoSegregationConflicts } = require('../services/segregationPolicyService');
 const {
@@ -305,7 +305,9 @@ exports.getPermissionCatalog = (req, res) => {
   res.json({
     permissions: PERMISSIONS,
     high_risk_permissions: [...HIGH_RISK_PERMISSIONS],
-    role_templates: ROLE_TEMPLATES
+    role_templates: ROLE_TEMPLATES,
+    permission_aliases: TIMESHEET_PERMISSION_ALIASES,
+    permission_labels: TIMESHEET_PERMISSION_LABELS
   });
 };
 

@@ -16,7 +16,7 @@ async function loadVerifiedSummary({db,userId,fromDate,toDate,records,lock=false
  return assessVerifiedAttendance({staff,records,fromDate,toDate,now});
 }
 function diagnostics(summary){return{verified_total_minutes:summary.totalMinutes,verified_total_hours:summary.actualHours,historical_saved_hours:summary.historicalSavedHours,verification_status:summary.status,review_required:summary.reviewRequired,review_issues:summary.reviewIssues,duplicate_records:summary.duplicates,eligible_record_count:summary.eligibleRecords.length,source_record_count:summary.records.length,company_timezone:summary.timezone,reporting_basis:'WHOLE_SHIFT_LOCAL_START_DATE'};}
-function assertReviewResolved(summary){if(summary.reviewRequired)throw Object.assign(new Error('Attendance source records require authorised correction before this timesheet can be submitted or approved.'),{statusCode:409,code:'TIMESHEET_ATTENDANCE_REVIEW_REQUIRED',details:{review_issues:summary.reviewIssues}});}
+function assertReviewResolved(summary){if(summary.reviewRequired)throw Object.assign(new Error('Attendance source records require authorised correction before this timesheet can be finalized or reported.'),{statusCode:409,code:'TIMESHEET_ATTENDANCE_REVIEW_REQUIRED',details:{review_issues:summary.reviewIssues}});}
 // Presentation is derived from the same assessment used by approvals and weekly
 // PDFs. Raw saved values remain available for review, never counted as verified.
 function presentAttendance(summary){

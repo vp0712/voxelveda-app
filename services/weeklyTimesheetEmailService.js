@@ -73,6 +73,13 @@ function validateSource(snapshot) {
   const issued = instant(snapshot.generated_at, 'Report issue time');
   if (issued < start.plus({ days: 7 })) throw contentError('A weekly report cannot be issued before its reporting week is completed.', 'WEEKLY_HTML_PERIOD_INVALID');
   const status = sourceText(snapshot.review_status, 'Review status', 40, true).toUpperCase();
+  if (status === 'FINAL' && (snapshot.finalization_verified !== true || snapshot.finalization_policy !== 'AUTOMATIC_WEEK_FINAL_V1' ||
+      !Number.isSafeInteger(snapshot.review_version) || snapshot.review_version < 1 || snapshot.approval_verified === true || snapshot.approved_hours !== undefined)) {
+    throw contentError('Final timesheets require a verified completed-week source version, without a fabricated approval.', 'WEEKLY_HTML_FINALIZATION_INVALID');
+  }
+  if (status === 'IN_PROGRESS' || status === 'REVIEW_REQUIRED') {
+    throw contentError('Only a completed week with resolved attendance may be delivered.', 'WEEKLY_HTML_ATTENDANCE_REVIEW_REQUIRED');
+  }
   const approvedHours = snapshot.approved_hours ?? snapshot.total_minutes / 60;
   if (!/^[A-Z_ ]+$/.test(status) || (status === 'APPROVED' && snapshot.approval_verified !== true) ||
       (snapshot.approved_hours !== undefined && (status !== 'APPROVED' || snapshot.approval_verified !== true)) ||
@@ -113,7 +120,8 @@ function validateSource(snapshot) {
   return { staffName, issued, status };
 }
 function statusLabel(status) {
-  return ({ DRAFT: 'Provisional — Draft', OPEN: 'Submitted — Pending approval', SUBMITTED: 'Submitted — Pending approval',
+  return ({ FINAL: 'Final — no approval required', IN_PROGRESS: 'In progress — reporting week is open',
+    DRAFT: 'Provisional — Draft', OPEN: 'Submitted — Pending approval', SUBMITTED: 'Submitted — Pending approval',
     PENDING_APPROVAL: 'Submitted — Pending approval', CORRECTION_RESUBMITTED: 'Correction resubmitted — Pending approval',
     CORRECTION_REQUIRED: 'Review required — Correction requested', REVIEW_REQUIRED: 'Review required',
     REJECTED: 'Rejected — Correction required', APPROVED: 'Approved' })[status] || `Provisional — ${status.replace(/_/g, ' ')}`;
@@ -129,7 +137,8 @@ function renderWeeklyTimesheetEmail(snapshot) {
   const approved = status === 'APPROVED';
   const data = timesheetDocumentData({ rows: snapshot.rows, fromDate: snapshot.period_start, toDate: snapshot.period_end, staffId: snapshot.staff_id,
     staffName: snapshot.staff_name, employeeReference: snapshot.employee_reference, totalMinutes: snapshot.total_minutes, totalHours: snapshot.total_minutes / 60,
-    status, timezone: snapshot.timezone, version: snapshot.version, generatedAt: snapshot.generated_at, approvedHours: snapshot.approved_hours });
+    status, timezone: snapshot.timezone, version: snapshot.version, generatedAt: snapshot.generated_at, approvedHours: snapshot.approved_hours,
+    finalizationVerified: snapshot.finalization_verified, finalizationPolicy: snapshot.finalization_policy, finalizationVersion: snapshot.review_version });
   const company = companyProfile();
   const companyName = sourceText(company.legalName || company.name, 'Company name', 500, true);
   const details = [companyName, company.address, company.phone, company.email, company.abn ? `ABN ${company.abn}` : ''].filter(Boolean).map(value => sourceText(value, 'Company details', 1500));

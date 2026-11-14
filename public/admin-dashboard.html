@@ -163,7 +163,7 @@
             <button class="secondary-btn" type="button" data-workspace-section="staffSection" onclick="return goSection('staffSection')">Manage Access</button>
           </div>
           <div class="vv-suite-grid">
-            <button type="button" class="vv-suite-card" data-workspace-section="attendanceSection" onclick="return goSection('attendanceSection')"><span>Time Clock</span><strong>Timesheet approvals</strong><small>Clock-in review, payroll export and correction queue.</small></button>
+            <button type="button" class="vv-suite-card" data-workspace-section="attendanceSection" onclick="return goSection('attendanceSection')"><span>Time Clock</span><strong>Timesheet records</strong><small>Recorded work, automatic weekly finalisation and authorised corrections.</small></button>
             <button type="button" class="vv-suite-card" data-workspace-section="rosterSection" onclick="return goSection('rosterSection')"><span>Rostering</span><strong>Shift planning</strong><small>Publish shifts, locations, notes and staff coverage.</small></button>
             <button type="button" class="vv-suite-card" data-workspace-section="taskSection" onclick="return goSection('taskSection')"><span>Tasks</span><strong>Quick task control</strong><small>Assign work, announcements and production updates.</small></button>
             <button type="button" class="vv-suite-card" data-workspace-section="staffSection" onclick="return goSection('staffSection')"><span>Staff Directory</span><strong>Access and profiles</strong><small>Users, permissions, QR bypass, documents and messages.</small></button>
@@ -736,14 +736,14 @@
         </div>
         <div class="metric-grid workforce-command-metrics">
           <div class="card kpi-blue"><h3>Clocked In Now</h3><p><strong id="clockedInCount">0</strong></p><span>Active shifts on the floor</span></div>
-          <button type="button" class="card kpi-teal workforce-kpi-action" onclick="return reviewPendingTimesheets()"><h3>Pending Timesheets</h3><p><strong id="pendingTimesheetCount">0</strong></p><span>Waiting for manager review</span></button>
-          <button type="button" class="card kpi-green workforce-kpi-action" onclick="return reviewPayrollReadyTimesheets()"><h3>Payroll Ready</h3><p><strong id="payrollReadyCount">0</strong></p><span>Approved or clean summaries</span></button>
+          <button type="button" class="card kpi-teal workforce-kpi-action" onclick="return reviewPendingTimesheets()"><h3>Attendance Review</h3><p><strong id="pendingTimesheetCount">0</strong></p><span>Source records needing authorised correction</span></button>
+          <button type="button" class="card kpi-green workforce-kpi-action" onclick="return reviewPayrollReadyTimesheets()"><h3>Final Timesheets</h3><p><strong id="payrollReadyCount">0</strong></p><span>Completed verified reporting weeks</span></button>
           <button type="button" class="card kpi-red workforce-kpi-action" onclick="return reviewOvertimeTimesheets()"><h3>Overtime Alerts</h3><p><strong id="overtimeWarningCount">0</strong></p><span>Shifts over standard limits</span></button>
         </div>
 
         <div class="card workforce-action-centre">
           <div class="section-head">
-            <div><h3>Weekly Timesheet Delivery</h3><p>Only recorded worked attendance is eligible. Each staff member’s individual PDF goes to their saved designated address, with one To recipient and no copies.</p></div>
+            <div><h3>Weekly Timesheet Delivery</h3><p>Completed weeks finalise automatically from verified recorded work. Monday emails contain each employee’s individual timesheet and go only to their registered account email, with no copies. Zero-hour weeks are not emailed; a PDF is optional.</p></div>
             <button class="secondary-btn" onclick="return loadWeeklyTimesheetDeliveries(1)">Refresh deliveries</button>
           </div>
           <div class="form-grid">
@@ -753,7 +753,7 @@
             <label class="form-field"><span>Delivery status</span><select id="weeklyDeliveryStatus" onchange="loadWeeklyTimesheetDeliveries(1)"><option value="">All statuses</option><option>QUEUED</option><option>SENT</option><option>PROVIDER_ACCEPTED</option><option>REVIEW_REQUIRED</option><option>NO_RECIPIENT</option><option>NO_WORK</option><option>GENERATION_FAILED</option><option>PREPARING</option></select></label>
           </div>
           <p id="weeklyDeliverySchedule" class="status-note">Loading the company weekly delivery schedule…</p>
-          <div class="table-wrap"><table><thead><tr><th>Staff</th><th>Week</th><th>PDF snapshot hours</th><th>Version / status</th><th>Review / delivery</th><th>Actions</th></tr></thead><tbody id="weeklyDeliveryBody"><tr><td colspan="6">Open Workforce to review weekly deliveries.</td></tr></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Staff</th><th>Week</th><th>Report snapshot hours</th><th>Version / status</th><th>Review / delivery</th><th>Actions</th></tr></thead><tbody id="weeklyDeliveryBody"><tr><td colspan="6">Open Workforce to review weekly deliveries.</td></tr></tbody></table></div>
           <div class="register-pagination"><span id="weeklyDeliveryPageSummary">0 deliveries</span><div><button class="secondary-btn" onclick="return loadWeeklyTimesheetDeliveries(Math.max(1, weeklyDeliveryState.page - 1))">Previous</button><button class="secondary-btn" onclick="return loadWeeklyTimesheetDeliveries(weeklyDeliveryState.page + 1)">Next</button></div></div>
         </div>
         <div class="card workforce-action-centre">
@@ -788,16 +788,15 @@
         <div class="card table-wrap">
           <div class="section-head">
             <div>
-              <h3>Timesheet Approval Ledger</h3>
-              <p>Pending work stays separate from approved payroll records.</p>
+              <h3>Weekly Timesheet Register</h3>
+              <p>No routine approval is needed. Completed weeks become final automatically. Permitted reviewers can correct actual shift records with an audit reason.</p>
             </div>
           </div>
           <div class="timesheet-workflow-tabs" role="tablist" aria-label="Timesheet status">
-            <button type="button" class="timesheet-tab active" data-timesheet-status="PENDING_APPROVAL" onclick="return setTimesheetTab('PENDING_APPROVAL')">Pending</button>
-            <button type="button" class="timesheet-tab" data-timesheet-status="APPROVED" onclick="return setTimesheetTab('APPROVED')">Approved</button>
-            <button type="button" class="timesheet-tab" data-timesheet-status="CORRECTION_REQUIRED" onclick="return setTimesheetTab('CORRECTION_REQUIRED')">Correction Required</button>
-            <button type="button" class="timesheet-tab" data-timesheet-status="REJECTED" onclick="return setTimesheetTab('REJECTED')">Rejected</button>
-            <button type="button" class="timesheet-tab" data-timesheet-status="ALL" onclick="return setTimesheetTab('ALL')">All</button>
+            <button type="button" class="timesheet-tab active" data-timesheet-status="ALL" onclick="return setTimesheetTab('ALL')">All</button>
+            <button type="button" class="timesheet-tab" data-timesheet-status="IN_PROGRESS" onclick="return setTimesheetTab('IN_PROGRESS')">In progress</button>
+            <button type="button" class="timesheet-tab" data-timesheet-status="FINAL" onclick="return setTimesheetTab('FINAL')">Final</button>
+            <button type="button" class="timesheet-tab" data-timesheet-status="REVIEW_REQUIRED" onclick="return setTimesheetTab('REVIEW_REQUIRED')">Attendance review</button>
             <button type="button" class="timesheet-tab" data-timesheet-status="ARCHIVED" onclick="return setTimesheetTab('ARCHIVED')">Archived</button>
           </div>
           <table>
@@ -805,10 +804,10 @@
               <tr>
                 <th>Staff</th>
                 <th>Period</th>
-                <th>Submitted Hrs</th>
+                <th>Recorded Hrs</th>
                 <th>Ordinary</th>
                 <th>Overtime</th>
-                <th>Approved</th>
+                <th>Final Hrs</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>

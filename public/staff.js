@@ -304,8 +304,10 @@ function getEffectivePermissions() {
     VIEW_OWN_TIMESHEET: ['attendance'],
     VIEW_TEAM_TIMESHEET: ['attendance'],
     VIEW_ALL_TIMESHEETS: ['attendance'],
-    APPROVE_TEAM_TIMESHEET: ['attendance', 'attendance_input'],
-    APPROVE_ALL_TIMESHEETS: ['attendance', 'attendance_input'],
+    EDIT_TEAM_TIMESHEET: ['attendance'],
+    APPROVE_TEAM_TIMESHEET: ['attendance'],
+    EDIT_ALL_TIMESHEETS: ['attendance'],
+    APPROVE_ALL_TIMESHEETS: ['attendance'],
     VIEW_ATTENDANCE: ['attendance', 'roster'],
     EDIT_ATTENDANCE: ['attendance', 'attendance_input', 'roster', 'roster_input'],
     VIEW_INVENTORY: ['stock', 'stock_in', 'stock_out', 'raw_material', 'packaging'],
@@ -2393,100 +2395,32 @@ function updateTimesheetVarianceSignals(totalHours = null) {
   setText('timesheetVarianceSignal', rostered ? `${variance >= 0 ? '+' : '-'}${Math.abs(variance).toFixed(2)} hrs` : 'No roster');
   setText('timesheetVarianceDetail', rostered ? `${recorded.toFixed(2)} verified vs ${rostered.toFixed(2)} scheduled in this reporting week` : 'No scheduled roster in this reporting week');
   if (!currentWeekTimesheet) {
-    setText('timesheetPayrollSignal', recorded > 0 ? 'Draft' : 'Open');
+    setText('timesheetPayrollSignal','In progress');
   }
 }
 
 function timesheetStatusLabel(status) {
-  const labels = {
-    DRAFT: 'Draft',
-    PENDING_APPROVAL: 'Pending Approval',
-    CORRECTION_RESUBMITTED: 'Resubmitted',
-    APPROVED: 'Approved',
-    REJECTED: 'Rejected',
-    CORRECTION_REQUIRED: 'Correction Required',
-    ARCHIVED: 'Archived'
-  };
-  return labels[String(status || 'DRAFT').toUpperCase()] || 'Draft';
+  const labels={IN_PROGRESS:'In progress',FINAL:'Final',REVIEW_REQUIRED:'Attendance review required',APPROVED:'Approved historical record',ARCHIVED:'Archived',DRAFT:'In progress',PENDING_APPROVAL:'In progress',CORRECTION_RESUBMITTED:'In progress',CORRECTION_REQUIRED:'Attendance review required',REJECTED:'Attendance review required'};
+  return labels[String(status||'IN_PROGRESS').toUpperCase()]||'In progress';
 }
 
-function renderCurrentTimesheetWorkflow(timesheet, totalHours, source = {}) {
-  currentWeekTimesheet = timesheet ? {...timesheet, source_review_required:source.review_required,source_review_issues:source.review_issues} : null;
-  const status = String(timesheet?.status || 'DRAFT').toUpperCase();
-  const statusEl = document.getElementById('currentTimesheetStatus');
-  const submitButton = document.getElementById('submitTimesheetBtn');
-  const managerNote = document.getElementById('currentTimesheetManagerNote');
-  const payrollLabels = {
-    DRAFT: 'Draft',
-    PENDING_APPROVAL: 'Awaiting Approval',
-    CORRECTION_RESUBMITTED: 'Awaiting Review',
-    APPROVED: String(timesheet?.payroll_status || '').toUpperCase() === 'READY' ? 'Payroll Ready' : 'Approved',
-    REJECTED: 'Rejected',
-    CORRECTION_REQUIRED: 'Action Required',
-    ARCHIVED: 'Archived'
-  };
-
-  if (statusEl) {
-    statusEl.className = `timesheet-status-chip ${status.toLowerCase()}`;
-    statusEl.textContent = source.unavailable?'Unavailable':timesheetStatusLabel(status);
-  }
-
-  if (submitButton) {
-    const editable = ['DRAFT', 'CORRECTION_REQUIRED'].includes(status);
-    const canSubmit = editable && Number.isFinite(Number(totalHours)) && Number(totalHours) > 0 && Boolean(timesheet?.id) && source.review_required!==true && !source.unavailable;
-    let reason=document.getElementById('timesheetSubmitReason');if(!reason){reason=document.createElement('p');reason.id='timesheetSubmitReason';reason.className='status-note';reason.setAttribute('role','status');submitButton.after(reason);}
-    reason.textContent=source.unavailable?'Timesheet unavailable. Retry loading before submitting.':source.review_required?(source.review_issues||[]).some(issue=>['INCOMPLETE_SHIFT','INCOMPLETE_SHIFT_REQUIRES_REVIEW'].includes(issue.code))?'Finish the open session or request a correction before submitting. Live time is not verified payroll time.':'Source attendance needs an authorised correction before submission.':!timesheet?.id?'The weekly record is not ready. Reload My timesheets.':Number(totalHours)===0?'No eligible completed work is recorded for this period. Open or excluded sessions are not counted.':editable?'Verified completed work is ready for submission.':'This period is '+timesheetStatusLabel(status).toLowerCase()+'.';
-    submitButton.title=canSubmit?'Submit verified completed hours':reason.textContent;
-    submitButton.classList.toggle('hidden-section', !editable);
-    submitButton.disabled = !canSubmit;
-    submitButton.textContent = status === 'CORRECTION_REQUIRED' ? 'Resubmit Timesheet' : 'Submit Timesheet';
-  }
-
-  setText('timesheetPayrollSignal',source.unavailable?'Unavailable':source.review_required?'Source review required':payrollLabels[status] || 'Open');
-
-  if (managerNote) {
-    const note = String(timesheet?.manager_comments || '').trim();
-    managerNote.classList.toggle('hidden-section', !note);
-    managerNote.innerHTML = note ? `<strong>Manager note:</strong> ${escapeHtml(note)}` : '';
-  }
+function renderCurrentTimesheetWorkflow(timesheet,totalHours,source={}) {
+  currentWeekTimesheet=timesheet?{...timesheet,source_review_required:source.review_required,source_review_issues:source.review_issues}:null;
+  const status=String(timesheet?.lifecycle_status||timesheet?.status||'IN_PROGRESS').toUpperCase();
+  const statusEl=document.getElementById('currentTimesheetStatus');
+  if(statusEl){statusEl.className=`timesheet-status-chip ${status.toLowerCase()}`;statusEl.textContent=source.unavailable?'Unavailable':timesheetStatusLabel(status);}
+  document.getElementById('submitTimesheetBtn')?.remove();
+  document.getElementById('timesheetSubmitReason')?.remove();
+  setText('timesheetPayrollSignal',source.unavailable?'Unavailable':source.review_required?'Attendance review required':timesheetStatusLabel(status));
+  const policy=document.getElementById('currentTimesheetPolicy');
+  if(policy)policy.textContent=source.unavailable?'Timesheet unavailable. Retry loading your saved records.':source.review_required?'Some attendance requires an authorised correction. You can request a correction; no submission or routine approval is needed.':Number(totalHours)===0?'No eligible completed work is recorded for this period. Zero-hour weeks are not emailed. No submission or approval is needed.':status==='FINAL'?'This completed week is final. Its individual report is scheduled for Monday delivery to your registered account email. Only an authorised reviewer can correct source records.':status==='APPROVED'?'This historical approved record is preserved. New reporting weeks finalise automatically without submission or approval.':'This reporting week is in progress. Verified completed work will become final automatically after the week ends. Only an authorised reviewer can correct a shift.';
+  const managerNote=document.getElementById('currentTimesheetManagerNote');
+  if(managerNote){const note=String(timesheet?.manager_comments||'').trim();managerNote.classList.toggle('hidden-section',!note);managerNote.innerHTML=note?`<strong>Recorded reviewer note:</strong> ${escapeHtml(note)}`:'';}
 }
 
 async function submitCurrentTimesheet() {
-  const timesheet = currentWeekTimesheet;
-  const selectionEpoch=staffTimesheetSelectionEpoch,submissionOwner=Number(currentUser.id),submissionAccount=VoxelActions.account(),submissionPeriod=String(timesheet?.week_start||'').slice(0,10);
-  if (!timesheet?.id) {
-    showToast('Current weekly timesheet is not ready yet.', {kind:'info'});
-    return;
-  }
-  const status = String(timesheet.status || 'DRAFT').toUpperCase();
-  if (!['DRAFT', 'CORRECTION_REQUIRED'].includes(status)) {
-    showToast('This timesheet has already been submitted.', {kind:'info'});
-    return;
-  }
-  if (Number(timesheet.total_hours || 0) <= 0) {
-    showToast('Record shift hours before submitting this timesheet.', {kind:'error'});
-    return;
-  }
-  if (!(await VoxelFeedback.confirm(status === 'CORRECTION_REQUIRED'
-    ? 'Resubmit this corrected timesheet for manager approval?'
-    : 'Submit this weekly timesheet for manager approval?', {"title":"Submit timesheet","confirmLabel":"Submit timesheet"}))) return;
-
-  if(selectionEpoch!==staffTimesheetSelectionEpoch||submissionOwner!==Number(currentUser.id)||submissionAccount!==VoxelActions.account()||!currentWeekTimesheet||Number(currentWeekTimesheet.id)!==Number(timesheet.id)||Number(currentWeekTimesheet.version_no)!==Number(timesheet.version_no)||String(currentWeekTimesheet.week_start||'').slice(0,10)!==submissionPeriod||String(currentWeekTimesheet.status||'').toUpperCase()!==status)return showToast('The selected week or account changed while confirming. Reload the intended week and review it before submitting.',{kind:'error'});
-  if(currentWeekTimesheet.source_review_required)return showToast('Source attendance needs correction before submission.', {kind:'error'});
-  const button = document.getElementById('submitTimesheetBtn');
-  if(button?.dataset.submitting==='true')return;
-  if (button) {button.disabled = true;button.dataset.submitting='true';}
-  try {
-    await VoxelActions.timesheet({id:Number(timesheet.id),status:status==='CORRECTION_REQUIRED'?'CORRECTION_RESUBMITTED':'PENDING_APPROVAL',title:'Timesheet submitted',url:`/api/attendance/timesheets/${Number(timesheet.id)}/submit`,headers:authHeaders(),body:{expected_version:timesheet.version_no},
-      context:`${currentUser.name||'Your timesheet'} · ${VoxelActions.date(timesheet.week_start)} – ${VoxelActions.date(timesheet.week_end)}`,
-      onCommit:row=>{if(selectionEpoch!==staffTimesheetSelectionEpoch)return;currentWeekTimesheet={...timesheet,...row};renderCurrentTimesheetWorkflow(currentWeekTimesheet,Number(row.total_hours));},
-      refresh:()=>loadTimesheet(),reopen:()=>loadTimesheet()});
-  } finally {
-    if (button && ['DRAFT', 'CORRECTION_REQUIRED'].includes(String(currentWeekTimesheet?.status || '').toUpperCase())) {
-      button.disabled = Boolean(currentWeekTimesheet?.source_review_required);
-    }
-    if(button)delete button.dataset.submitting;
-  }
+  showToast('No timesheet submission or approval is needed. Completed verified weeks finalise automatically.',{kind:'info'});
+  return loadTimesheet();
 }
 
 function renderMyRoster(rows) {
@@ -2706,7 +2640,8 @@ async function loadTimesheet() {
         staffTimesheetTimezone=weekData.company_timezone||null;
         const weekInput=document.getElementById('staffTimesheetWeek');if(weekInput&&weekData.week_start){weekInput.value=weekData.week_start;weekInput.max=weekData.current_week_start||weekData.week_start;}
         const nextWeek=document.getElementById('staffTimesheetNextWeek');if(nextWeek)nextWeek.disabled=weekData.week_start===(weekData.current_week_start||weekData.week_start);
-        setText('timesheetApprovedSignal',String(weekData.timesheet?.status).toUpperCase()==='APPROVED'?Number(weekData.timesheet.approved_hours).toFixed(2)+' hrs':'Not approved');
+        const finalStatus=String(weekData.timesheet?.lifecycle_status||weekData.timesheet?.status||'IN_PROGRESS').toUpperCase(),finalHours=weekData.timesheet?.final_hours??(finalStatus==='APPROVED'?weekData.timesheet?.approved_hours:null);
+        setText('timesheetApprovedSignal',['FINAL','APPROVED'].includes(finalStatus)&&finalHours!==null&&finalHours!==''&&Number.isFinite(Number(finalHours))?Number(finalHours).toFixed(2)+' hrs':finalStatus==='REVIEW_REQUIRED'?'Attendance review required':'Week in progress');
         renderCurrentTimesheetWorkflow(weekData.timesheet, totalHours, weekData);
 
         if (currentWeekRange) {

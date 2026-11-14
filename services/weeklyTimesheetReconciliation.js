@@ -3,6 +3,8 @@ const pool = require('../config/db');
 const policy = require('./weeklyTimesheetEligibility');
 const { hasPermission, canAccessUserRecord } = require('./authorizationService');
 const REASONS = Object.freeze({
+  TIMESHEET_FINALIZATION_UNVERIFIED: 'The saved final timesheet no longer matches its verified attendance version. Review the source correction and create a controlled revision; no automatic resend is permitted.',
+  SOURCE_REVISION_REQUIRED: 'Current attendance differs from the retained email report. The previous version and provider outcome are preserved. An authorised reviewer must reconcile and explicitly send a labelled revision.',
   INCOMPLETE_SHIFT: 'A shift has no confirmed checkout. Confirm the actual finish time and request an attendance correction.',
   INCOMPLETE_SHIFT_REQUIRES_REVIEW: 'A saved shift requires review. Confirm its actual start, finish and unpaid breaks with an authorised reviewer.',
   ATTENDANCE_TIMEZONE_UNVERIFIED: 'The original timestamp timezone is unverified. A reviewer must confirm the actual local start and finish.',
@@ -76,6 +78,13 @@ function reportMetadata(delivery, document) {
   }
 }
 function nextAction(row, dispatch) {
+  if (row.revision_required) {
+    if (['DELIVERY_UNKNOWN','SENDING','LEGACY_WEEKLY_DELIVERY_REVIEW'].includes(row.status)) return { code: 'REVIEW_PROVIDER', message: 'Attendance changed. Reconcile the previous provider outcome before authorising a corrected report; do not resend automatically.' };
+    if (row.eligibility === 'INELIGIBLE_ACCOUNT' || row.eligibility === 'NO_WORK') return { code: 'REVIEW_SOURCE', message: 'The retained report differs from current eligibility. Preserve the previous message and resolve the actual attendance/account evidence; no empty replacement email is sent.' };
+    if (row.eligibility === 'REVIEW_REQUIRED') return { code: 'REVIEW_SOURCE', message: 'Correct the identified attendance issues before authorising a revised report. The previous email is unchanged.' };
+    if (!row.recipient_configured) return { code: 'SET_REGISTERED_EMAIL', message: REASONS.NO_RECIPIENT };
+    return { code: 'AUTHORISE_REVISION', message: REASONS.SOURCE_REVISION_REQUIRED };
+  }
   if (row.recipient_verified) return { code: 'NONE', message: 'Recipient receipt has been verified.' };
   if (row.provider_accepted) return { code: 'CHECK_RECEIPT', message: 'The provider accepted this message. Recipient receipt remains unverified; do not resend automatically.' };
   if (['DELIVERY_UNKNOWN', 'SENDING', 'LEGACY_WEEKLY_DELIVERY_REVIEW'].includes(row.status)) return { code: 'REVIEW_PROVIDER', message: 'Reconcile the previous transport outcome before considering another message.' };
@@ -85,7 +94,7 @@ function nextAction(row, dispatch) {
   if (!row.recipient_configured) return { code: 'SET_REGISTERED_EMAIL', message: REASONS.NO_RECIPIENT };
   if (row.status === 'REVIEW_REQUIRED' || ['INVALID','UNSUPPORTED'].includes(row.report?.status)) return { code: 'REVIEW_SNAPSHOT', message: 'Review this retained report snapshot and its recorded blocker before an authorised correction or retry.' };
   if (row.status === 'GENERATION_FAILED' || (row.delivery_format === 'PDF' && row.pdf.status === 'GENERATION_FAILED')) return { code: 'RETRY_GENERATION', message: row.delivery_format === 'HTML' ? 'Review the email report preparation failure, then request an authorised controlled retry. Optional PDF generation is separate.' : 'Review the PDF generation failure, then request an authorised controlled retry. No substitute attachment will be sent.' };
-  if (row.status === 'FAILED') return { code: 'REVIEW_FAILURE', message: 'Review the recorded transport failure and attempt budget before an authorised recovery. Failed delivery is not approval failure.' };
+  if (row.status === 'FAILED') return { code: 'REVIEW_FAILURE', message: 'Review the recorded transport failure and attempt budget before an authorised recovery. Finalization and email delivery have separate outcomes.' };
   if (row.status === 'RETRYING') return { code: 'WAIT_FOR_RETRY', message: 'The durable worker will retry within its attempt budget. Opening the application is not required.' };
   if (['QUEUED', 'PREPARING'].includes(row.status)) return { code: 'WAIT_FOR_WORKER', message: 'The background worker is processing this individual report. Opening the application is not required.' };
   if (dispatch.state === 'NOT_DUE') return { code: 'WAIT_FOR_SCHEDULE', message: 'This report is not due before its configured company send time.' };
@@ -124,6 +133,19 @@ async function reconcileWeek(options = {}) {
     if (delivery?.email_queue_id) [[queue]] = await db.query('SELECT id,status,attempts,max_attempts,next_attempt_at,claimed_at,provider_accepted_at,recipient_verified_at FROM email_queue WHERE id=?',[delivery.email_queue_id]);
     if (delivery?.document_request_id) [[document]] = await db.query('SELECT id,generation_status,pdf_sha256,pdf_pages,email_queue_id FROM document_delivery_requests WHERE id=?',[delivery.document_request_id]);
     const report = reportMetadata(delivery, document);
+    let snapshotMinutes = null, sourceChanged = false;
+    if (delivery?.snapshot_json) {
+      try {
+        const frozen = JSON.parse(delivery.snapshot_json);
+        const validIdentity = Number(frozen.staff_id) === Number(staff.id) && frozen.period_start === period.start && frozen.period_end === period.end &&
+          Number(frozen.version) === Number(delivery.version) && policy.snapshotHash(frozen) === delivery.source_sha256;
+        if (validIdentity && Number.isSafeInteger(frozen.total_minutes) && frozen.total_minutes >= 0) snapshotMinutes = frozen.total_minutes;
+        if (validIdentity && assessment.status !== 'INELIGIBLE_ACCOUNT' && Array.isArray(frozen.rows)) {
+          sourceChanged = Number(frozen.total_minutes) !== assessment.totalMinutes || policy.snapshotHash(frozen.rows) !== policy.snapshotHash(assessment.rows) ||
+            Boolean(sheet && (Number(frozen.review_version || 0) !== Number(sheet.version_no || 0) || String(frozen.review_status) !== String(sheet.status)));
+        }
+      } catch { /* Existing report integrity diagnostics remain authoritative. */ }
+    }
     const stored = reasons(delivery?.review_reasons_json), current = reasons(assessment.issues);
     const distinct = new Map(current.map(issue => [issue.code+':'+(issue.attendance_id||''),issue]));
     if (delivery?.last_error_code && ['REVIEW_REQUIRED','GENERATION_FAILED','FAILED','RETRY'].includes(delivery.status)) for (const issue of reasons([delivery.last_error_code])) distinct.set(issue.code,issue);
@@ -146,6 +168,7 @@ async function reconcileWeek(options = {}) {
       previous_queue_outcomes:priorQueues.filter(item=>Number(item.id)!==Number(delivery?.email_queue_id)).map(item=>({id:item.id,status:queueOutcome(null,item),recipient_verified:Boolean(item.recipient_verified_at)})),
       generation_attempts:documents.map(item=>({id:item.id,status:item.generation_status,pages:item.pdf_pages,queue_id:item.email_queue_id})),
       delivery_id:delivery?.id || null, version:delivery?.version || null, status:delivery || queue ? queueOutcome(delivery,queue) : assessment.status==='ELIGIBLE' ? recipientValid?'MISSING_DELIVERY':'NO_RECIPIENT' : assessment.status,
+      snapshot_minutes:snapshotMinutes, source_changed:sourceChanged, revision_required:sourceChanged, delivery_revision_required:sourceChanged,
       review_reasons:[...distinct.values()], previous_review_reasons:stored, last_error_code:delivery?.last_error_code || null,
       delivery_format:report.format, report,
       pdf:document ? { status:document.generation_status,pages:document.pdf_pages,sha256:document.pdf_sha256,required_for_email:report.format==='PDF' } : {status:'NOT_GENERATED',required_for_email:report.format==='PDF'},
@@ -155,6 +178,7 @@ async function reconcileWeek(options = {}) {
       document_request_id:document?.id || null, provider_accepted:queueOutcome(delivery,queue)==='PROVIDER_ACCEPTED',recipient_verified:Boolean(queue?.recipient_verified_at) };
     if(!delivery?.email_queue_id&&priorQueues.length){row.status='LEGACY_WEEKLY_DELIVERY_REVIEW';row.review_reasons.push(reasons(['LEGACY_WEEKLY_DELIVERY_REVIEW'])[0]);}
     else if (recipientHold) row.status = 'REVIEW_REQUIRED';
+    if (sourceChanged) row.review_reasons.push(reasons(['SOURCE_REVISION_REQUIRED'])[0]);
     if(!document&&documents[0]?.generation_status==='GENERATION_FAILED')row.pdf={status:'GENERATION_FAILED',required_for_email:report.format==='PDF'};
     // A resolved, unsnapshotted eligibility blocker must not remain the
     // current diagnosis solely because the scheduler has not run again yet.

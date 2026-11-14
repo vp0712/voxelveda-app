@@ -77,6 +77,10 @@ const ACCESS_OPTIONS = [
   { id: 'roster_input', label: 'Roster Input/Edit' },
   { id: 'attendance', label: 'Attendance' },
   { id: 'attendance_input', label: 'Attendance Input/Edit' },
+  { id: 'VIEW_TEAM_TIMESHEET', label: 'View assigned team timesheets' },
+  { id: 'VIEW_ALL_TIMESHEETS', label: 'View company timesheets' },
+  { id: 'EDIT_TEAM_TIMESHEET', label: 'Edit assigned team shift times (audited)' },
+  { id: 'EDIT_ALL_TIMESHEETS', label: 'Edit company shift times (audited)' },
   { id: 'attendance_qr_bypass', label: 'QR Shift Bypass' },
   { id: 'leave', label: 'Leave Requests' },
   { id: 'availability', label: 'Availability' },
@@ -1976,7 +1980,8 @@ function accessSwitchInput(accessId, inputId, checked = false, label = '') {
 }
 
 function accessCheckboxes(selected = [], prefix = 'access') {
-  const enabled = new Set(selected);
+  const aliases={APPROVE_TEAM_TIMESHEET:'EDIT_TEAM_TIMESHEET',APPROVE_ALL_TIMESHEETS:'EDIT_ALL_TIMESHEETS'};
+  const enabled = new Set(selected.map(id=>aliases[id]||id));
   const visibleOptions = ACCESS_OPTIONS.filter((item) => item.id !== 'attendance_qr_bypass');
 
   return `
@@ -1993,7 +1998,8 @@ function accessCheckboxes(selected = [], prefix = 'access') {
 
 function accessLabels(selected = []) {
   const labels = new Map(ACCESS_OPTIONS.map((item) => [item.id, item.label]));
-  return selected.map((id) => labels.get(id) || id);
+  const aliases={APPROVE_TEAM_TIMESHEET:'EDIT_TEAM_TIMESHEET',APPROVE_ALL_TIMESHEETS:'EDIT_ALL_TIMESHEETS'};
+  return [...new Set(selected.map(id=>aliases[id]||id))].map(id=>labels.get(id)||id);
 }
 
 function isValidEmail(value) {
@@ -2034,6 +2040,8 @@ function collectAccess() {
     tasks_input: ['tasks'],
     roster_input: ['roster'],
     attendance_input: ['attendance'],
+    EDIT_TEAM_TIMESHEET: ['VIEW_TEAM_TIMESHEET'],
+    EDIT_ALL_TIMESHEETS: ['VIEW_ALL_TIMESHEETS'],
     attendance_qr_bypass: ['attendance'],
     stock_in_input: ['stock', 'stock_in'],
     stock_out_input: ['stock', 'stock_out'],
@@ -7628,16 +7636,15 @@ document.addEventListener('DOMContentLoaded', bootAdminDashboard);
 
 /* ================= WORKFORCE OPS SUITE 20260703 ================= */
 window.vvTimesheetCache = window.vvTimesheetCache || [];
-let activeTimesheetTab = 'PENDING_APPROVAL';
+let activeTimesheetTab = 'ALL';
 function rosterNetHours(shift) { return Math.max(0, rosterShiftHours(shift) - (Number(shift.break_minutes || 0) / 60)); }
 function rosterShiftCost(shift) { return rosterNetHours(shift) * Number(shift.hourly_rate || 0); }
 function rosterWeekKey(value) { var date = new Date(value || todayISO()); if (Number.isNaN(date.getTime())) return 'Unscheduled'; var day = date.getDay(); date.setDate(date.getDate() - day + (day === 0 ? -6 : 1)); return date.toISOString().slice(0, 10); }
 function updateWorkforceDashboardMetrics() {
   const timesheets = window.vvTimesheetCache || [];
   const active = attendanceCache.filter((row) => row.clock_in && !row.clock_out).length;
-  const pendingStatuses = new Set(['PENDING_APPROVAL', 'CORRECTION_RESUBMITTED']);
-  const pending = timesheets.filter((row) => pendingStatuses.has(String(row.status || '').toUpperCase())).length;
-  const payrollReady = timesheets.filter((row) => String(row.payroll_status || '').toUpperCase() === 'READY').length;
+  const pending=timesheets.filter(row=>timesheetLifecycleStatus(row)==='REVIEW_REQUIRED').length;
+  const payrollReady=timesheets.filter(row=>timesheetLifecycleStatus(row)==='FINAL').length;
   const overtime = timesheets.filter((row) => Number(row.overtime_hours || 0) > 0).length;
   setText('clockedInCount', active);
   setText('pendingTimesheetCount', pending);
@@ -7737,192 +7744,76 @@ function renderTimesheetNote(note) {
   return escapeHtml(note || '-');
 }
 
+function timesheetLifecycleStatus(record) { return String(record?.lifecycle_status||record?.status||'IN_PROGRESS').toUpperCase(); }
 function reviewPendingTimesheets() {
-  setTimesheetTab('PENDING_APPROVAL');
-  const pending = (window.vvTimesheetCache || []).filter((row) => ['PENDING_APPROVAL', 'CORRECTION_RESUBMITTED'].includes(String(row.status || '').toUpperCase()));
-  showToast(pending.length ? `${pending.length} pending timesheet${pending.length === 1 ? '' : 's'} ready for review` : 'No pending timesheets', {kind:'info'});
+  setTimesheetTab('REVIEW_REQUIRED');
+  const pending=(window.vvTimesheetCache||[]).filter(row=>timesheetLifecycleStatus(row)==='REVIEW_REQUIRED');
+  showToast(pending.length?`${pending.length} timesheet${pending.length===1?'':'s'} need an authorised attendance correction`:'No attendance issues require review',{kind:'info'});
 }
-
-
-function focusTimesheetRegister(message, rowClass) {
-  const section = document.getElementById('timesheetAdminBody')?.closest('.table-wrap');
-  if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  if (rowClass) {
-    document.querySelectorAll('#timesheetAdminBody tr').forEach((row) => row.classList.remove('timesheet-focus-row'));
-    document.querySelectorAll(rowClass).forEach((row) => row.classList.add('timesheet-focus-row'));
-    window.setTimeout(() => document.querySelectorAll(rowClass).forEach((row) => row.classList.remove('timesheet-focus-row')), 2800);
-  }
-  showToast(message, {kind:'info'});
+function focusTimesheetRegister(message,rowClass) {
+  document.getElementById('timesheetAdminBody')?.closest('.table-wrap')?.scrollIntoView({behavior:'smooth',block:'start'});
+  if(rowClass){document.querySelectorAll('#timesheetAdminBody tr').forEach(row=>row.classList.remove('timesheet-focus-row'));document.querySelectorAll(rowClass).forEach(row=>row.classList.add('timesheet-focus-row'));window.setTimeout(()=>document.querySelectorAll(rowClass).forEach(row=>row.classList.remove('timesheet-focus-row')),2800);}
+  showToast(message,{kind:'info'});
 }
-
 function reviewPayrollReadyTimesheets() {
-  setTimesheetTab('APPROVED');
-  const ready = (window.vvTimesheetCache || []).filter((row) => String(row.status || '').toUpperCase() === 'APPROVED');
-  focusTimesheetRegister(ready.length ? `${ready.length} payroll-ready timesheet${ready.length === 1 ? '' : 's'}` : 'No approved payroll-ready timesheets yet', '.timesheet-approved-row');
+  setTimesheetTab('FINAL');
+  const ready=(window.vvTimesheetCache||[]).filter(row=>timesheetLifecycleStatus(row)==='FINAL');
+  focusTimesheetRegister(ready.length?`${ready.length} final timesheet${ready.length===1?'':'s'}`:'No completed final timesheets yet','.timesheet-final-row');
 }
-
 function reviewOvertimeTimesheets() {
-  const overtime = (attendanceCache || []).filter((row) => Number(row.total_hours || 0) > 10);
-  const section = document.getElementById('attendanceTableBody')?.closest('.table-wrap');
-  if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  showToast(overtime.length ? `${overtime.length} overtime alert${overtime.length === 1 ? '' : 's'} in the register` : 'No overtime alerts', {kind:'info'});
+  const overtime=(attendanceCache||[]).filter(row=>Number(row.total_hours||0)>10);
+  document.getElementById('attendanceTableBody')?.closest('.table-wrap')?.scrollIntoView({behavior:'smooth',block:'start'});
+  showToast(overtime.length?`${overtime.length} overtime alert${overtime.length===1?'':'s'} in the register`:'No overtime alerts',{kind:'info'});
 }
-
-async function updateTimesheetStatus(id, status) {
-  if(status==='APPROVED')return openTimesheetDecision(id,'approve');
-  if(status==='REJECTED')return openTimesheetDecision(id,'reject');
-  if(status==='CORRECTION_REQUIRED')return openTimesheetDecision(id,'correction');
-  try {
-    const res = await fetch('/api/attendance/timesheets/status', {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify({ id, status })
-    });
-    const data = await safeJson(res);
-    showToast(data.message || (res.ok ? 'Timesheet updated' : 'Timesheet update failed'), {kind:res.ok?'success':'error',httpStatus:res.status});
-    if (res.ok) await loadTimesheets();
-  } catch (err) {
-    showToast('Timesheet update failed', {kind:'error'});
-  }
-}
-
-function formatTimesheetStatusLabel(value) {
-  return String(value || 'DRAFT')
-    .trim()
-    .toLowerCase()
-    .replace(/[\s-]+/g, '_')
-    .split('_')
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-}
-
+async function updateTimesheetStatus(id) { return openTimesheetDetail(id); }
+function formatTimesheetStatusLabel(value) { return String(value||'IN_PROGRESS').trim().toLowerCase().replace(/[\s-]+/g,'_').split('_').filter(Boolean).map(word=>word.charAt(0).toUpperCase()+word.slice(1)).join(' '); }
 function renderTimesheetStatusChip(status) {
-  const clean = String(status || 'DRAFT').toLowerCase();
-  const labels = {
-    draft: 'Draft',
-    pending_approval: 'Pending Approval',
-    correction_resubmitted: 'Resubmitted',
-    approved: 'Approved',
-    rejected: 'Rejected',
-    correction_required: 'Correction Required',
-    archived: 'Archived'
-  };
-  const label = labels[clean] || formatTimesheetStatusLabel(clean);
-  return '<span class="timesheet-status-chip ' + escapeHtml(clean) + '">' + escapeHtml(label) + '</span>';
+  const clean=String(status||'IN_PROGRESS').toLowerCase(),labels={in_progress:'In progress',final:'Final',review_required:'Attendance review required',approved:'Approved historical record',archived:'Archived',draft:'Recorded legacy status',pending_approval:'Recorded legacy status',correction_resubmitted:'Recorded legacy status',rejected:'Historical rejected record',correction_required:'Attendance review required'};
+  return '<span class="timesheet-status-chip '+escapeHtml(clean)+'">'+escapeHtml(labels[clean]||formatTimesheetStatusLabel(clean))+'</span>';
 }
-
-function timesheetMatchesActiveTab(row) {
-  const status = String(row.status || 'DRAFT').toUpperCase();
-  if (activeTimesheetTab === 'ALL') return true;
-  if (activeTimesheetTab === 'PENDING_APPROVAL') {
-    return ['PENDING_APPROVAL', 'CORRECTION_RESUBMITTED'].includes(status);
-  }
-  return status === activeTimesheetTab;
-}
-
+function timesheetMatchesActiveTab(row) { return activeTimesheetTab==='ALL'||timesheetLifecycleStatus(row)===activeTimesheetTab; }
 function setTimesheetTab(status) {
-  activeTimesheetTab = String(status || 'PENDING_APPROVAL').toUpperCase();
-  document.querySelectorAll('.timesheet-tab').forEach((button) => {
-    button.classList.toggle('active', button.dataset.timesheetStatus === activeTimesheetTab);
-  });
-  renderTimesheetRegister();
-  document.getElementById('timesheetAdminBody')?.closest('.table-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  activeTimesheetTab=String(status||'ALL').toUpperCase();
+  document.querySelectorAll('.timesheet-tab').forEach(button=>button.classList.toggle('active',button.dataset.timesheetStatus===activeTimesheetTab));
+  renderTimesheetRegister();document.getElementById('timesheetAdminBody')?.closest('.table-wrap')?.scrollIntoView({behavior:'smooth',block:'start'});
 }
-
+function timesheetClockLabel(row,name,zone) {
+  const value=row[name+'_utc_text']||row[name];if(!value)return 'Not recorded';
+  const basis=name==='clock_out'?(row.clock_out_timestamp_basis||row.timestamp_basis):row.timestamp_basis,text=String(value);
+  if(basis!=='UTC'&&!/[Zz]|[+-]\d{2}:\d{2}$/.test(text))return text.replace('T',' ')+' · timestamp basis needs review';
+  if(!zone)return 'Workplace timezone unavailable';
+  const date=new Date(/[Zz]|[+-]\d{2}:\d{2}$/.test(text)?text:text.replace(' ','T')+'Z');
+  try{return Number.isFinite(date.getTime())?new Intl.DateTimeFormat('en-AU',{dateStyle:'medium',timeStyle:'short',timeZone:zone}).format(date):'Not recorded';}catch{return 'Workplace timezone unavailable';}
+}
 async function openTimesheetDetail(id) {
-  const owner=VoxelActions.account(),sequence=openTimesheetDetail.sequence=(openTimesheetDetail.sequence||0)+1;
-  const current=()=>owner===VoxelActions.account()&&sequence===openTimesheetDetail.sequence;
+  const owner=VoxelActions.account(),sequence=openTimesheetDetail.sequence=(openTimesheetDetail.sequence||0)+1,current=()=>owner===VoxelActions.account()&&sequence===openTimesheetDetail.sequence;
   try {
-  const res = await fetch(`/api/attendance/timesheets/${Number(id)}`, { headers: authHeaders() });
-  if(!current())return;
-  const data = await safeJson(res);
-  if(!current())return;
-  if (!res.ok) return showToast(data.message || 'Unable to load timesheet detail', {kind:'error'});
-  const timesheet = data.timesheet || {};
-  const summary = data.summary || {};
-  const detailHours = (value, missing = 'Not recorded') => ((typeof value==='number'||typeof value==='string'&&value.trim()!=='')&&Number.isFinite(Number(value))&&Number(value)>=0) ? Number(value).toFixed(2)+' hrs' : missing;
-  const records = data.summary?.records || [];
-  const rows = records.map((row) => `
-    <tr><td>${escapeHtml(String(row.work_date || '').slice(0, 10))}</td><td>${escapeHtml(formatDateTime(row.clock_in))}</td><td>${escapeHtml(formatDateTime(row.clock_out))}</td><td>${escapeHtml(detailHours(row.total_hours))}</td><td>${renderTimesheetNote(row.notes)}</td></tr>
-  `).join('') || '<tr><td colspan="5">No attendance records.</td></tr>';
-  showDialog('Timesheet Review', `
-    <div class="timesheet-detail-summary">
-      <article><small>Employee</small><strong>${escapeHtml(timesheet.name || timesheet.email || '-')}</strong></article>
-      <article><small>Period</small><strong>${escapeHtml(String(timesheet.week_start || '').slice(0, 10))} to ${escapeHtml(String(timesheet.week_end || '').slice(0, 10))}</strong></article>
-      <article><small>Verified completed source</small><strong>${escapeHtml(detailHours(summary.actualHours))}</strong></article>
-      <article><small>Saved / submitted</small><strong>${escapeHtml(detailHours(timesheet.total_hours))}</strong></article>
-      <article><small>Approved hours</small><strong>${String(timesheet.status).toUpperCase()==='APPROVED'?escapeHtml(detailHours(timesheet.approved_hours)):'Not approved'}</strong></article>
-      <article><small>Status</small><strong>${renderTimesheetStatusChip(timesheet.status)}</strong></article>
-    </div>
-    ${summary.reviewRequired||summary.review_required?'<p class="status-note" role="status">Some source attendance needs authorised review. Verified completed source excludes open or unverified work; entering approved hours cannot resolve it.</p>':''}
-    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table></div>
-    ${timesheet.manager_comments ? `<div class="status-note"><strong>Manager note:</strong> ${escapeHtml(timesheet.manager_comments)}</div>` : ''}
-  `, hideDialog, 'Close');
-  document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
-  } catch(error) { if(current())return showToast(error.message || 'Unable to load timesheet detail', {kind:'error'}); }
+    const res=await fetch(`/api/attendance/timesheets/${Number(id)}`,{headers:authHeaders()});if(!current())return;
+    const data=await safeJson(res);if(!current())return;if(!res.ok)return showToast(data.message||'Unable to load timesheet detail',{kind:'error'});
+    const timesheet=data.timesheet||{},summary=data.summary||{},status=timesheetLifecycleStatus(timesheet),zone=summary.company_timezone||data.company_timezone||timesheet.timezone;
+    if(Number(timesheet.id)!==Number(id))throw new Error('The returned timesheet did not match this record.');
+    const detailHours=(value,missing='Not recorded')=>((typeof value==='number'||typeof value==='string'&&value.trim()!=='')&&Number.isFinite(Number(value))&&Number(value)>=0)?Number(value).toFixed(2)+' hrs':missing;
+    const canEdit=timesheet.can_edit===true&&Number(timesheet.user_id)!==Number(currentUser?.id),records=summary.records||[];
+    if(records.some(row=>row.user_id!=null&&Number(row.user_id)!==Number(timesheet.user_id)))throw new Error('The source attendance does not match this employee. Reload the authorised record.');
+    const rows=records.map(row=>`<tr><td>${escapeHtml(VoxelActions.date(row.work_date||row.allocated_work_date))}</td><td>${escapeHtml(timesheetClockLabel(row,'clock_in',zone))}</td><td>${escapeHtml(timesheetClockLabel(row,'clock_out',zone))}</td><td>${row.break_minutes==null?'Not recorded':escapeHtml(row.break_minutes)+' min'}</td><td>${escapeHtml(detailHours(row.verified_worked_minutes!=null?Number(row.verified_worked_minutes)/60:row.total_hours))}</td><td>${renderTimesheetNote(row.notes)}</td>${canEdit?`<td>${row.can_edit_source!==false?`<button type="button" class="secondary-btn" data-vv-action-icon="edit" data-timesheet-edit-shift="${Number(row.id)}">Edit recorded shift</button>`:'Locked source record'}</td>`:''}</tr>`).join('')||`<tr><td colspan="${canEdit?7:6}">No source attendance records.</td></tr>`;
+    const finalHours=timesheet.final_hours??(status==='APPROVED'?timesheet.approved_hours:null);
+    showDialog('Weekly Timesheet',`<div class="timesheet-detail-summary"><article><small>Employee</small><strong>${escapeHtml(timesheet.name||'-')}</strong></article><article><small>Period</small><strong>${escapeHtml(VoxelActions.date(timesheet.week_start))} to ${escapeHtml(VoxelActions.date(timesheet.week_end))}</strong></article><article><small>Verified completed source</small><strong>${escapeHtml(detailHours(summary.actualHours))}</strong></article><article><small>${timesheet.account_ineligible?'Historical saved work (unverified)':'Saved recorded work'}</small><strong>${escapeHtml(detailHours(timesheet.total_hours))}</strong></article><article><small>Final hours</small><strong>${escapeHtml(detailHours(finalHours,status==='REVIEW_REQUIRED'?'Attendance review required':'Week in progress'))}</strong></article><article><small>Status</small><strong>${renderTimesheetStatusChip(status)}</strong></article></div>${timesheet.delivery_revision_required||timesheet.revision_required||timesheet.source_changed?'<p class="source-review-warning" role="status">Recorded work changed after a retained report snapshot. The earlier report and provider outcome are preserved. Sending the corrected report requires an authorised labelled revision; no automatic resend is made.</p>':''}${timesheet.account_ineligible?'<p class="status-note">This historical saved record is preserved. The account is inactive or ineligible; current verified hours are unavailable and source editing is disabled.</p>':''}<p class="status-note">No routine approval or employee submission is needed. Completed weeks become final automatically from verified worked attendance. Only a permitted reviewer can correct a saved shift.</p>${summary.reviewRequired||summary.review_required?'<p class="source-review-warning" role="status">Some source attendance needs authorised correction. Unresolved or open entries are not converted into completed work.</p>':''}${timesheet.edit_blocker?`<p class="status-note">${escapeHtml(timesheet.edit_blocker)}</p>`:''}<div class="table-wrap"><table><thead><tr><th>Shift date</th><th>Clock in</th><th>Clock out</th><th>Recorded break</th><th>Worked hours</th><th>Notes</th>${canEdit?'<th>Correction</th>':''}</tr></thead><tbody>${rows}</tbody></table></div>${timesheet.manager_comments?`<p class="status-note"><strong>Recorded reviewer note:</strong> ${escapeHtml(timesheet.manager_comments)}</p>`:''}<h4>History</h4>${(data.approvals||data.history||[]).map(item=>`<p>${escapeHtml(item.actor_name||'Recorded actor')} · ${escapeHtml(item.action||item.status||'Recorded change')} · ${escapeHtml(item.comments||item.reason||'')}</p>`).join('')||'<p>No manual corrections recorded.</p>'}`,hideDialog,'Close');
+    document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
+    document.querySelectorAll('[data-timesheet-edit-shift]').forEach(button=>button.onclick=()=>openTimesheetEdit(id,Number(button.dataset.timesheetEditShift)));
+  }catch(error){if(current())return showToast(error.message||'Unable to load timesheet detail',{kind:'error'});}
 }
-
-async function approveTimesheetRecord(id, approvedHours, comments = '', source = {}) {
-  return VoxelActions.timesheet({id,hours:approvedHours,url:`/api/attendance/timesheets/${Number(id)}/approve`,headers:authHeaders(),
-    body:{approved_hours:approvedHours,comments,reason:comments,expected_version:source.version_no,expected_source_minutes:source.minutes},
-    context:source.context,close:hideDialog,onCommit:row=>{window.vvTimesheetCache=(window.vvTimesheetCache||[]).map(t=>Number(t.id)===Number(id)?{...t,...row}:t);renderTimesheetRegister();updateWorkforceDashboardMetrics();},
-    refresh:()=>loadTimesheets({throwOnError:true}),reopen:()=>{hideDialog();return openTimesheetDecision(id,'approve',undefined,{comments});},
-    errorActions:[{label:'Return to form'},{label:'Refresh source',run:()=>{hideDialog();openTimesheetDecision(id,'approve',undefined,{comments});}}]});
+async function openTimesheetEdit(id,attendanceId) {
+  if(!window.VoxelWeeklyDelivery?.edit)return showToast('The source correction controls are unavailable. Refresh the application.',{kind:'error'});
+  return window.VoxelWeeklyDelivery.edit(Number(id),attendanceId==null?undefined:Number(attendanceId),{refresh:()=>loadTimesheets({throwOnError:true})});
 }
-
-async function reviewTimesheetAttendance(detail) {
-  const record=detail.timesheet,source=detail.summary;
-  const go=()=>{if(window.VoxelStaffHome)return window.VoxelStaffHome.openHistory('all',{userId:record.user_id,from:String(record.week_start).slice(0,10),to:String(record.week_end).slice(0,10)});
-    const rows=source.records||[];attendanceCache=[...attendanceCache.filter(r=>!rows.some(a=>Number(a.id)===Number(r.id))),...rows];
-    showDialog('Review source attendance',`<p>${escapeHtml(record.name||record.staff_name||'Staff')} · ${escapeHtml(VoxelActions.date(record.week_start))} – ${escapeHtml(VoxelActions.date(record.week_end))}</p><p>Workplace timezone: ${escapeHtml(source.company_timezone||source.timezone||'Australia/Sydney')}. Confirm actual start, finish and recorded unpaid breaks. Saved review flags are not resolved by entering approved hours.</p><div class="source-review-list">${rows.map(row=>`<article><strong>Attendance #${Number(row.id)}</strong><dl><div><dt>Start</dt><dd>${escapeHtml(formatDateTime(row.clock_in))}</dd></div><div><dt>Finish</dt><dd>${row.clock_out?escapeHtml(formatDateTime(row.clock_out)):'Not recorded'}</dd></div><div><dt>Recorded breaks</dt><dd>${row.break_minutes==null?'Not recorded':Number(row.break_minutes)+' minutes'}</dd></div></dl>${hasCurrentPermission('EDIT_ATTENDANCE')?`<button data-vv-action-icon="edit" class="secondary-btn" onclick="return openAttendanceDialog(${Number(row.id)})">Review / correct this session</button>`:''}</article>`).join('')||'<p>No source records in this reporting period.</p>'}</div><button data-vv-action-icon="refresh" class="secondary-btn" onclick="return openTimesheetDecision(${Number(record.id)},'approve')">Reload verified hours after correction</button>`,null,'Close');};
-  if(window.VoxelDialog?.active?.dirty){const answer=await VoxelFeedback.show({kind:'warning',title:'Open attendance review?',message:'The approval has not been saved. Discard the entered approval values to review the source attendance.',actions:[{label:'Return to form'},{label:'Review attendance',value:'review'}]});if(answer!=='review')return;}hideDialog();go();
-}
-
-async function openTimesheetDecision(id, action, submittedHours, draft = {}) {
-  const owner=VoxelActions.account();let detail;
-  try{detail=await VoxelActions.request(`/api/attendance/timesheets/${Number(id)}`,{headers:authHeaders()});}catch(error){if(owner!==VoxelActions.account())return;return showToast(error.message,{kind:'error'});}
-  if(owner!==VoxelActions.account())return;
-  const source=detail.summary,record=detail.timesheet;
-  if(!source||!record||source.actualHours==null||!Number.isFinite(Number(source.actualHours)))return showToast('Verified source hours are unavailable. Refresh before deciding.',{kind:'error'});
-  const blocked=Boolean(source.reviewRequired||source.review_required),ready=['PENDING_APPROVAL','CORRECTION_RESUBMITTED'].includes(record.status);
-  submittedHours=action==='amend'?record.approved_hours:source.actualHours;
-  const context=`${record.name||record.staff_name||'Staff member'} · ${VoxelActions.date(record.week_start)} – ${VoxelActions.date(record.week_end)}`;
-  const decisionSource={version_no:record.version_no,minutes:source.verified_total_minutes,context};
-  const labels={approve:['Approve Timesheet','Approve'],correction:['Request Correction','Send Request'],reject:['Reject Timesheet','Reject'],amend:['Amend Approved Timesheet','Save Amendment']};
-  const [title,buttonText]=labels[action]||labels.approve,needsReason=action!=='approve';
-  const issues=source.reviewIssues||source.review_issues||[];
-  showDialog(title,`<dl class="decision-context"><div><dt>Employee</dt><dd>${escapeHtml(record.name||record.staff_name||'Staff member')}</dd></div><div><dt>Reporting period</dt><dd>${escapeHtml(VoxelActions.date(record.week_start))} – ${escapeHtml(VoxelActions.date(record.week_end))}</dd></div><div><dt>Status</dt><dd>${renderTimesheetStatusChip(record.status)}</dd></div><div><dt>Verified completed source</dt><dd>${Number(source.actualHours).toFixed(2)} hrs</dd></div></dl>
-    ${blocked?`<div class="source-review-warning"><p role="alert">Some source attendance is excluded pending authorised review. Approved hours and a comment cannot resolve these records.</p><ul>${issues.map(issue=>`<li>${escapeHtml(VoxelWeeklyDelivery.reason(issue.code))}${issue.attendance_id?' · Attendance #'+Number(issue.attendance_id):''}</li>`).join('')}</ul><button type="button" id="timesheetReviewAttendance" class="secondary-btn">Review attendance</button><button type="button" id="timesheetReloadSource" class="secondary-btn">Reload source after correction</button></div>`:'<p class="status-note">Any difference in approved hours requires an audit reason. Original recorded work is preserved.</p>'}
-    <div class="form-stack">${['approve','amend'].includes(action)?`<label>Approved hours<input id="timesheetDecisionHours" type="number" min="0" max="168" step="0.01" required value="${Number(submittedHours||0).toFixed(2)}" ${blocked?'disabled':''}></label>`:''}<label><span id="timesheetDecisionCommentLabel">${action==='reject'?'Rejection reason (required)':action==='correction'?'What needs correcting? (required)':action==='amend'?'Amendment reason (required)':'Comment (optional at verified hours)'}</span><textarea id="timesheetDecisionComments" rows="3" maxlength="4000" ${needsReason?'required':''} aria-describedby="timesheetDecisionCommentHelp">${escapeHtml(draft.comments||'')}</textarea></label><p id="timesheetDecisionCommentHelp" class="muted">${action==='approve'?'Approve the verified source hours without adding a comment. Explain any adjustment; recorded work stays unchanged.':action==='correction'?'Tell the employee which attendance or timesheet information needs correction.':action==='reject'?'Give the employee an actionable reason for rejection.':'Explain the change to this approved record. The previous approved version is retained.'}</p></div>`,async()=>{
-      if(owner!==VoxelActions.account())throw new Error('Account changed. Reopen this record.');
-      const comments=document.getElementById('timesheetDecisionComments').value.trim(),approvedHours=Number(document.getElementById('timesheetDecisionHours')?.value??submittedHours);
-      if(action==='approve'&&blocked)throw new Error('Review the source attendance before approval.');
-      if(['approve','amend'].includes(action)&&Math.abs(approvedHours-Number(source.actualHours))>0.00001&&!comments){VoxelDialog.validate(document.getElementById('dialogBody'),[{field:'timesheetDecisionComments',message:'Explain why approved hours differ from verified source hours.'}]);return;}
-      if(action==='approve')return approveTimesheetRecord(id,approvedHours,comments,decisionSource);
-      const body=action==='amend'?{approved_hours:approvedHours,reason:comments,expected_version:record.version_no,expected_source_minutes:source.verified_total_minutes}:{comments,expected_version:record.version_no};
-      return VoxelActions.timesheet({id,hours:action==='amend'?approvedHours:null,status:action==='reject'?'REJECTED':action==='correction'?'CORRECTION_REQUIRED':'APPROVED',title:action==='amend'?'Amendment saved':action==='reject'?'Timesheet rejected':'Correction requested',context,url:`/api/attendance/timesheets/${Number(id)}/${action}`,headers:authHeaders(),body,close:hideDialog,onCommit:row=>{window.vvTimesheetCache=(window.vvTimesheetCache||[]).map(t=>Number(t.id)===Number(id)?{...t,...row}:t);renderTimesheetRegister();},refresh:()=>loadTimesheets({throwOnError:true}),reopen:()=>{hideDialog();openTimesheetDecision(id,action);}});
-    },buttonText,{disabled:['approve','amend'].includes(action)&&(blocked||action==='approve'&&!ready)});
-  document.getElementById('timesheetReviewAttendance')?.addEventListener('click',()=>reviewTimesheetAttendance(detail));
-  document.getElementById('timesheetReloadSource')?.addEventListener('click',()=>{const comments=document.getElementById('timesheetDecisionComments')?.value||'';hideDialog();openTimesheetDecision(id,action,undefined,{comments});});
-  if(action==='approve')document.getElementById('timesheetDecisionHours')?.addEventListener('input',()=>{
-    const value=document.getElementById('timesheetDecisionHours').value,adjusted=value!==''&&Number.isFinite(Number(value))&&Math.abs(Number(value)-Number(source.actualHours))>0.00001;
-    const comments=document.getElementById('timesheetDecisionComments');if(comments)comments.required=adjusted;
-    const label=document.getElementById('timesheetDecisionCommentLabel');if(label)label.textContent=adjusted?'Adjustment explanation (required)':'Comment (optional at verified hours)';
-  });
-}
-
+// Retained function names do not perform historical approval/status writes.
+async function approveTimesheetRecord(id) { return openTimesheetDetail(id); }
+async function reviewTimesheetAttendance(detail) { return openTimesheetEdit(Number(detail.timesheet.id)); }
+async function openTimesheetDecision(id) { return openTimesheetEdit(id); }
 function renderTimesheetReviewActions(timesheet) {
-  const id = Number(timesheet.id || 0);
-  const status = String(timesheet.status || 'DRAFT').toUpperCase();
-  if (!id) return '-';
-  if (status === 'APPROVED') {
-    return `<div class="table-action-stack timesheet-review-actions vv-action-toolbar"><button data-vv-action-icon="view" class="secondary-btn small" onclick="return openTimesheetDetail(${id})">View</button><button data-vv-action-icon="revision" class="secondary-btn small" onclick="return openTimesheetDecision(${id}, 'amend', ${Number(timesheet.approved_hours || 0)})">Amend</button></div>`;
-  }
-  if (['PENDING_APPROVAL', 'CORRECTION_RESUBMITTED'].includes(status)) {
-    return `<div class="table-action-stack timesheet-review-actions vv-action-toolbar"><button data-vv-action-icon="view" class="secondary-btn small" onclick="return openTimesheetDetail(${id})">View</button><button data-vv-action-icon="approve" class="small-btn" onclick="return openTimesheetDecision(${id}, 'approve', ${Number(timesheet.total_hours || 0)})">Approve</button><button data-vv-action-icon="correction" class="secondary-btn small" onclick="return openTimesheetDecision(${id}, 'correction', ${Number(timesheet.total_hours || 0)})">Correction</button><button data-vv-action-icon="reject" class="danger-btn small" onclick="return openTimesheetDecision(${id}, 'reject', ${Number(timesheet.total_hours || 0)})">Reject</button></div>`;
-  }
-  return `<div class="table-action-stack timesheet-review-actions vv-action-toolbar"><button data-vv-action-icon="view" class="secondary-btn small" onclick="return openTimesheetDetail(${id})">View</button></div>`;
+  const id=Number(timesheet.id||0);if(!id)return '-';
+  const edit=timesheet.can_edit===true&&Number(timesheet.user_id)!==Number(currentUser?.id);
+  return `<div class="table-action-stack timesheet-review-actions vv-action-toolbar"><button data-vv-action-icon="view" class="secondary-btn small" onclick="return openTimesheetDetail(${id})">View</button>${edit?`<button data-vv-action-icon="edit" class="secondary-btn small" onclick="return openTimesheetEdit(${id})">Edit recorded shifts</button>`:''}</div>`;
 }
 
 function timesheetHours(value){return value!==null&&value!==undefined&&value!==''&&Number.isFinite(Number(value))?Number(value).toFixed(2):'Unavailable';}
@@ -7939,8 +7830,8 @@ function renderTimesheetRegister() {
     emptyMessage: `No ${activeTimesheetTab === 'ALL' ? '' : formatTimesheetStatusLabel(activeTimesheetTab)} timesheets.`,
     onChange: renderTimesheetRegister,
     rowRenderer: function(t) {
-      var status = String(t.status || 'DRAFT').toUpperCase();
-      return `<tr class="${status === 'APPROVED' ? 'timesheet-approved-row' : (['PENDING_APPROVAL', 'CORRECTION_RESUBMITTED'].includes(status) ? 'timesheet-pending-row' : '')}"><td><div class="record-identity"><strong>${escapeHtml(t.name || '-')}</strong><span class="cell-subtext">${escapeHtml(t.email || '-')}</span></div></td><td><div class="record-period">${escapeHtml(VoxelActions.date(t.week_start))}<span class="cell-subtext">to ${escapeHtml(VoxelActions.date(t.week_end))}</span></div></td><td><strong>${timesheetHours(t.total_hours)}</strong></td><td>${timesheetHours(t.ordinary_hours)}</td><td>${timesheetHours(t.overtime_hours)}</td><td>${status === 'APPROVED' ? timesheetHours(t.approved_hours) : '-'}</td><td>${renderTimesheetStatusChip(status)}</td><td>${renderTimesheetReviewActions(t)}</td></tr>`;
+      var status=timesheetLifecycleStatus(t);
+      return `<tr class="${status === 'FINAL' ? 'timesheet-final-row' : status === 'REVIEW_REQUIRED' ? 'timesheet-pending-row' : ''}"><td><div class="record-identity"><strong>${escapeHtml(t.name || '-')}</strong><span class="cell-subtext">${escapeHtml(t.email || '-')}</span></div></td><td><div class="record-period">${escapeHtml(VoxelActions.date(t.week_start))}<span class="cell-subtext">to ${escapeHtml(VoxelActions.date(t.week_end))}</span></div></td><td><strong>${t.account_ineligible?'Historical saved '+timesheetHours(t.total_hours)+' (unverified)':timesheetHours(t.recorded_hours??t.total_hours)}</strong></td><td>${timesheetHours(t.ordinary_hours)}</td><td>${timesheetHours(t.overtime_hours)}</td><td>${['FINAL','APPROVED'].includes(status)?timesheetHours(t.final_hours??t.approved_hours):status==='REVIEW_REQUIRED'?'Review required':'In progress'}</td><td>${renderTimesheetStatusChip(status)}</td><td>${renderTimesheetReviewActions(t)}</td></tr>`;
     }
   });
 }
@@ -8005,7 +7896,7 @@ function weeklyDeliveryReasons(row) {
   }).join('; ');
 }
 function canManageWeeklyDelivery() {
-  return hasCurrentPermission('SEND_COMPANY_EMAIL') && (hasCurrentPermission('MANAGE_COMPANY_EMAIL') || hasCurrentPermission('APPROVE_ALL_TIMESHEETS') || hasCurrentPermission('APPROVE_TEAM_TIMESHEET'));
+  return hasCurrentPermission('SEND_COMPANY_EMAIL') && (hasCurrentPermission('MANAGE_COMPANY_EMAIL') || hasCurrentPermission('EDIT_ALL_TIMESHEETS') || hasCurrentPermission('EDIT_TEAM_TIMESHEET') || hasCurrentPermission('APPROVE_ALL_TIMESHEETS') || hasCurrentPermission('APPROVE_TEAM_TIMESHEET'));
 }
 async function loadWeeklyTimesheetDeliveries(page = 1) {
   const owner=VoxelActions.account(),sequence=loadWeeklyTimesheetDeliveries.sequence=(loadWeeklyTimesheetDeliveries.sequence||0)+1;
@@ -8071,7 +7962,7 @@ function openWeeklyDeliveryRevision(deliveryId, retryGeneration = false, previou
   const row = weeklyDeliveryState.deliveries.find(delivery => Number(delivery.id) === Number(deliveryId));
   if (!row || !canManageWeeklyDelivery()) return showToast('Select a current delivery within your review authority', {kind:'error'});
   const uncertain = requireUncertainConfirmation || (row.status === 'REVIEW_REQUIRED' && Boolean(row.email_queue_id));
-  showDialog(retryGeneration ? 'Retry individual report generation' : 'Authorise corrected weekly report', `<p>Staff ${escapeHtml(row.staff_name)} · ${escapeHtml(String(row.period_start || '').slice(0,10))} to ${escapeHtml(String(row.period_end || '').slice(0,10))} · Current version ${Number(row.version)}</p><p class="status-note">${retryGeneration ? 'This retries the failed report generation against the retained, unchanged work record.' : 'This authorises a new labelled revision after rechecking actual worked attendance.'} Delivery uses only the staff member’s saved designated email.</p><label>Correction / retry reason<textarea id="weeklyRevisionReason" maxlength="1000" required>${escapeHtml(previousReason)}</textarea></label>${uncertain ? '<label class="access-toggle-row"><input id="weeklyPreviousDeliveryConfirmation" type="checkbox"><span>I reviewed the uncertain provider outcome and understand the previous version may already have been delivered. I explicitly authorise this correction.</span></label>' : ''}`, async () => {
+  showDialog(retryGeneration ? 'Retry individual report generation' : 'Authorise corrected weekly report', `<p>Staff ${escapeHtml(row.staff_name)} · ${escapeHtml(String(row.period_start || '').slice(0,10))} to ${escapeHtml(String(row.period_end || '').slice(0,10))} · Current version ${Number(row.version)}</p><p class="status-note">${retryGeneration ? 'This retries the failed report generation against the retained, unchanged work record.' : 'This authorises a new labelled revision after rechecking actual worked attendance.'} Delivery uses only the staff member’s registered account email.</p><label>Correction / retry reason<textarea id="weeklyRevisionReason" maxlength="1000" required>${escapeHtml(previousReason)}</textarea></label>${uncertain ? '<label class="access-toggle-row"><input id="weeklyPreviousDeliveryConfirmation" type="checkbox"><span>I reviewed the uncertain provider outcome and understand the previous version may already have been delivered. I explicitly authorise this correction.</span></label>' : ''}`, async () => {
     const reason = document.getElementById('weeklyRevisionReason')?.value.trim();
     if (!reason) return showToast('Enter the reason for this controlled action', {kind:'error'});
     const confirmation = uncertain && document.getElementById('weeklyPreviousDeliveryConfirmation')?.checked === true;

@@ -57,6 +57,7 @@ router.post('/timesheets/weekly-deliveries/:id/retry-generation', auth, weeklyDe
 router.get('/timesheets/payroll-ready', auth, timesheetWorkflowController.payrollReady);
 router.get('/timesheets/week/pdf', auth, requireAnyPermission('VIEW_OWN_TIMESHEET','VIEW_TEAM_TIMESHEET','VIEW_ALL_TIMESHEETS'), require('../controllers/staffTimesheetPdfController').download);
 router.get('/timesheets/:id', auth, timesheetWorkflowController.detail);
+router.post('/timesheets/:id/edit', auth, requireAnyPermission('EDIT_TEAM_TIMESHEET','EDIT_ALL_TIMESHEETS'), bodyContract(['attendance_id','expected_version','expected_revision','expected_source_minutes','request_id','clock_in','clock_out','break_minutes','notes','reason'], { required: ['attendance_id','expected_version','expected_revision','expected_source_minutes','request_id','clock_in','clock_out','reason'] }), timesheetWorkflowController.edit);
 router.post('/timesheets/:id/submit', auth, timesheetWorkflowController.submit);
 router.post('/timesheets/:id/approve', auth, timesheetWorkflowController.approve);
 router.post('/timesheets/:id/reject', auth, timesheetWorkflowController.reject);

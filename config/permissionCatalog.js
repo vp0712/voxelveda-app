@@ -58,6 +58,8 @@ const PERMISSIONS=Object.freeze([
   "VIEW_OWN_TIMESHEET",
   "VIEW_TEAM_TIMESHEET",
   "VIEW_ALL_TIMESHEETS",
+  "EDIT_TEAM_TIMESHEET",
+  "EDIT_ALL_TIMESHEETS",
   "APPROVE_TEAM_TIMESHEET",
   "APPROVE_ALL_TIMESHEETS",
   "VIEW_SUPPLIERS",
@@ -98,6 +100,18 @@ const PERMISSIONS=Object.freeze([
   "REGULATORY_REVIEW",
   "EXPORT_CONTROL_REVIEW"
 ]);
+// Approval keys remain valid for existing delegated reviewers, but describe the
+// same scoped edit authority. They do not enable the retired approval actions.
+const TIMESHEET_PERMISSION_ALIASES=Object.freeze({
+  APPROVE_TEAM_TIMESHEET: 'EDIT_TEAM_TIMESHEET',
+  APPROVE_ALL_TIMESHEETS: 'EDIT_ALL_TIMESHEETS'
+});
+const TIMESHEET_PERMISSION_LABELS=Object.freeze({
+  EDIT_TEAM_TIMESHEET: 'Edit team timesheets',
+  EDIT_ALL_TIMESHEETS: 'Edit all staff timesheets',
+  APPROVE_TEAM_TIMESHEET: 'Edit team timesheets (existing grant)',
+  APPROVE_ALL_TIMESHEETS: 'Edit all staff timesheets (existing grant)'
+});
 const QMS_PERMISSIONS=Object.freeze([
   "VIEW_QMS",
   "CREATE_QMS_RECORD",
@@ -220,7 +234,9 @@ const ROLE_TEMPLATES=Object.freeze(Object.assign(Object.create(null),{
     "VIEW_OWN_TIMESHEET",
     "VIEW_TEAM_TIMESHEET",
     "VIEW_ALL_TIMESHEETS",
+    "EDIT_TEAM_TIMESHEET",
     "APPROVE_TEAM_TIMESHEET",
+    "EDIT_ALL_TIMESHEETS",
     "APPROVE_ALL_TIMESHEETS",
     "VIEW_SUPPLIERS",
     "EDIT_SUPPLIERS",
@@ -296,7 +312,9 @@ const ROLE_TEMPLATES=Object.freeze(Object.assign(Object.create(null),{
     "VIEW_OWN_TIMESHEET",
     "VIEW_TEAM_TIMESHEET",
     "VIEW_ALL_TIMESHEETS",
+    "EDIT_TEAM_TIMESHEET",
     "APPROVE_TEAM_TIMESHEET",
+    "EDIT_ALL_TIMESHEETS",
     "APPROVE_ALL_TIMESHEETS",
     "VIEW_SUPPLIERS",
     "EDIT_SUPPLIERS",
@@ -379,6 +397,7 @@ const ROLE_TEMPLATES=Object.freeze(Object.assign(Object.create(null),{
     "VIEW_PAYROLL",
     "EDIT_PAYROLL",
     "VIEW_ALL_TIMESHEETS",
+    "EDIT_ALL_TIMESHEETS",
     "APPROVE_ALL_TIMESHEETS",
     "VIEW_ATTENDANCE",
     "VIEW_QMS",
@@ -395,6 +414,7 @@ const ROLE_TEMPLATES=Object.freeze(Object.assign(Object.create(null),{
     "EDIT_CUSTOMERS",
     "MANAGE_TEAM_JOBS",
     "VIEW_TEAM_TIMESHEET",
+    "EDIT_TEAM_TIMESHEET",
     "APPROVE_TEAM_TIMESHEET",
     "VIEW_MEETINGS",
     "MANAGE_MEETINGS",
@@ -420,6 +440,7 @@ const ROLE_TEMPLATES=Object.freeze(Object.assign(Object.create(null),{
     "VIEW_DASHBOARD",
     "MANAGE_TEAM_JOBS",
     "VIEW_TEAM_TIMESHEET",
+    "EDIT_TEAM_TIMESHEET",
     "APPROVE_TEAM_TIMESHEET",
     "VIEW_MEETINGS",
     "VIEW_ATTENDANCE",
@@ -646,4 +667,4 @@ const LEGACY_PERMISSION_MAP=Object.freeze({
     "MANAGE_PURCHASE_RETURNS"
   ]
 });
-module.exports={PERMISSIONS,QMS_PERMISSIONS,HIGH_RISK_PERMISSIONS,ROLE_TEMPLATES,LEGACY_PERMISSION_MAP};
+module.exports={PERMISSIONS,QMS_PERMISSIONS,HIGH_RISK_PERMISSIONS,ROLE_TEMPLATES,LEGACY_PERMISSION_MAP,TIMESHEET_PERMISSION_ALIASES,TIMESHEET_PERMISSION_LABELS};
