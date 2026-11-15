@@ -235,6 +235,21 @@ jobs:
           name: responsive-invoices-${{ github.sha }}
           path: ${{ runner.temp }}/responsive-invoice-proof
           retention-days: 30
+      - name: Verify scoped automatic company folders and complete invoice browsing
+        if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          UI_PROOF_DIR: ${{ runner.temp }}/invoice-folder-proof/chromium
+        run: |
+          timeout --signal=TERM --kill-after=10s 240s node scripts/invoice-folders-browser-test.js
+          VV_INVOICE_FOLDER_BROWSER_ENGINE=webkit UI_PROOF_DIR="$RUNNER_TEMP/invoice-folder-proof/webkit" timeout --signal=TERM --kill-after=10s 240s node scripts/invoice-folders-browser-test.js
+      - name: Preserve automatic company folder privacy, pagination and responsive evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: invoice-company-folders-${{ github.sha }}
+          path: ${{ runner.temp }}/invoice-folder-proof
+          retention-days: 30
       - name: Verify invoice review, structured views, one Close, discard and document versions
         if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
         env:

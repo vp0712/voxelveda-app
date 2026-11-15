@@ -47,7 +47,7 @@ function descriptor(input) {
   const type=String(input.type||'');if(!Object.hasOwn(TYPES,type))throw fail('This saved document does not support manual report email.',404,'REPORT_EMAIL_UNSUPPORTED');
   const d={type};
   for(const name of ['expected_sha256','expected_source_hash'])if(input[name]!==undefined&&!HASH.test(String(input[name])))throw fail('Use a valid expected document hash.');
-  if(type==='register') { if(!Object.hasOwn(REGISTER_PERMISSIONS,input.report))throw fail('This application report is not supported.',404,'REPORT_EMAIL_UNSUPPORTED');d.report=input.report;d.filters=filters(input.filters); }
+  if(type==='register') { if(!Object.hasOwn(REGISTER_PERMISSIONS,input.report))throw fail('This application report is not supported.',404,'REPORT_EMAIL_UNSUPPORTED');d.report=input.report;d.filters=filters(input.filters);if(d.filters.folder!==undefined&&(d.report!=='invoices'||!HASH.test(String(d.filters.folder))))throw fail('Choose a valid company invoice folder.'); }
   else if(type==='customer-statement') { d.filters=filters(input.filters);fields(d.filters,['search','customer_email','customer_name']); }
   else if(type==='invoice') {d.record_id=recordId(input.record_id);if(input.filters!==undefined){d.filters=filters(input.filters);fields(d.filters,['version']);if(d.filters.version&&!HASH.test(String(d.filters.version)))throw fail('Choose a valid saved invoice version.');}}
   else if(type==='qms-register') { if(!/^[a-z][a-z-]{0,59}$/.test(String(input.register||'')))throw fail('Choose a saved quality register.');d.register=input.register;d.filters=filters(input.filters); }

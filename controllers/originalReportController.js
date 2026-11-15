@@ -12,7 +12,7 @@ const REPORTS = Object.freeze({
     filters: ['q', 'status', 'archived'], sorts: ['id', 'customer', 'status', 'created', 'quantity'],
     columns: [['Customer', 'customer_name', 2.5], ['Email', 'email', 2.5], ['Material', 'material', 2], ['Qty', 'quantity', 1, 'number'], ['Status', 'status', 1], ['Created', 'created_at', 1.6, 'date']] },
   invoices: { title: 'Invoice register', module: 'invoice', method: 'getInvoices', key: 'invoices', permission: 'VIEW_FINANCE', paginated: true,
-    filters: ['search', 'status', 'payment_state', 'from','to','archived'], sorts: ['id', 'date', 'customer', 'total', 'balance', 'reference'],
+    filters: ['search', 'status', 'payment_state', 'from','to','archived','folder'], sorts: ['id', 'date', 'customer', 'total', 'balance', 'reference'],
     columns: [['Reference', 'invoice_no', 2], ['Customer', 'customer_name', 2.5], ['Status', 'status', 1.2], ['Total (AUD)', 'total', 1.8, 'moneyReview'],['Paid (AUD)','paid_amount',1.8,'moneyReview'],['Outstanding (AUD)','balance_due',1.8,'moneyReview'],['Payment','payment_state',1.8,'paymentState'], ['Created', 'created_at', 1.7, 'date']], total: ['Invoice value', 'total'] },
   customers: { title: 'Customer register', module: 'customer', method: 'getCustomers', key: 'customers', permission: 'VIEW_CUSTOMERS', paginated: true,
     filters: ['search'], sorts: ['id', 'company_name', 'contact_name', 'created_at', 'order_count', 'total_spend'],
@@ -74,6 +74,7 @@ function requestQuery(req, definition, timesheets = false) {
     if (!allowed.has(key)) throw reportError(`The ${key} filter is not supported for this report. No document was downloaded.`);
     if (!['string', 'number'].includes(typeof value)) throw reportError(`Use a single value for the ${key} filter.`);
     if (String(value).length > 255) throw reportError(`The ${key} filter is too long.`);
+    if (key === 'folder' && !/^[a-f0-9]{64}$/.test(String(value))) throw reportError('Choose a valid company invoice folder. No document was downloaded.');
     if (String(value).trim()) query[key] = String(value).trim();
   }
   if (query.download !== undefined && !['0', '1'].includes(query.download)) throw reportError('Download must be 0 or 1.');

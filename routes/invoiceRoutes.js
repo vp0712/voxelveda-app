@@ -8,6 +8,7 @@ const requireStepUp = require('../middleware/stepUpMiddleware');
 /* ================= GET ================= */
 
 router.get('/', invoiceController.getInvoices);
+router.get('/folders', invoiceController.getInvoiceFolders);
 
 router.get('/statement/search', invoiceController.searchCustomerStatements);
 router.get('/statement/pdf', invoiceController.viewCustomerStatementPdf);

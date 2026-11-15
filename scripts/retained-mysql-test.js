@@ -970,6 +970,7 @@ async function main() {
   await initializeRetainedSchemas();
   await testAudit();
   await testInvoicePaymentReview();
+  await require('./invoice-folders-mysql-fixture')({ pool, assert, facts, response });
   await testIdentityAndProfile();
   await testDocuments();
   await testQueue();
