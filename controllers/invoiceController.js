@@ -8,6 +8,7 @@ const { randomUUID, createHash } = require('node:crypto');
 const {hasPermission}=require('../services/authorizationService');
 const urls = require('../config/urls');
 const invoiceSummary=require('../services/invoiceSummaryService');
+const invoiceFolders=require('../services/invoiceFolderService');
 const centsMoney=require('../utils/money');
 const {companyProfile}=require('../config/companyProfile');
 const {dateOnly}=require('../utils/dateOnly');
@@ -356,28 +357,24 @@ exports.createManualInvoice=async(req,res)=>{
 exports.getInvoices = async (req, res) => {
   try {
     await ensureInvoiceColumns();
-    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1), limit = Math.max(1, Math.min(100, Number.parseInt(req.query.limit, 10) || 50));
-    const filters = [], params = [];
-    const archived=req.query.archived==='true';
-    if(archived&&!hasPermission(req.user,'VOID_TRANSACTION'))return res.status(403).json({message:'Archived invoice access is not permitted.'});
-    if (customerScoped(req.user)) { filters.push('LOWER(customer_email)=?'); params.push(customerEmail(req.user) || 'no-authorised-customer'); }
-    if (req.query.search) { filters.push('(invoice_no LIKE ? OR customer_name LIKE ? OR customer_email LIKE ?)'); params.push(...Array(3).fill(`%${String(req.query.search).slice(0, 120)}%`)); }
-    if (req.query.status) { filters.push('status=?'); params.push(String(req.query.status).toLowerCase()); }
-    if (req.query.payment_state) { filters.push('payment_state=?'); params.push(String(req.query.payment_state)); }
-    if(req.query.from){if(dateOnly(req.query.from)!==req.query.from)return res.status(422).json({message:'Enter a valid start date.',errors:{from:'Enter a valid calendar date.'}});filters.push('DATE(created_at)>=?');params.push(req.query.from);}
-    if(req.query.to){if(dateOnly(req.query.to)!==req.query.to)return res.status(422).json({message:'Enter a valid end date.',errors:{to:'Enter a valid calendar date.'}});filters.push('DATE(created_at)<=?');params.push(req.query.to);}
-    if(req.query.from&&req.query.to&&req.query.from>req.query.to)return res.status(422).json({message:'Start date must not follow end date.',errors:{to:'Choose an end date on or after the start date.'}});
-    const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+    const { page,limit,where,params,archived,sort,direction } = await invoiceFolders.scopedSelection(pool,req.query,req.user);
     const select=invoiceReceivableSelect(archived?'WHERE i.deleted=1':undefined);
-    const sorts = { date: 'created_at', customer: 'customer_name', total: 'total', balance: 'balance_due', reference: 'invoice_no',status:'status' };
-    const sort = Object.hasOwn(sorts,req.query.sort) ? sorts[req.query.sort] : 'id';
-    const direction = String(req.query.direction).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
     const [[count]] = await pool.query(`SELECT COUNT(*) total FROM (${select}) records ${where}`, params);
-    const [[totals]] = await pool.query(`SELECT SUM(total) total_value,SUM(paid_amount) paid_value,SUM(balance_due) balance_value,SUM(total IS NULL) missing_total,SUM(paid_amount IS NULL) missing_paid,SUM(balance_due IS NULL) missing_balance FROM (${select}) records ${where}`,params);
+    const [[totals]] = await pool.query(`SELECT ${invoiceFolders.totalsSql} FROM (${select}) records ${where}`,params);
     const [rows] = await pool.query(`SELECT * FROM (${select}) records ${where} ORDER BY ${sort} ${direction},id ${direction} LIMIT ? OFFSET ?`, [...params, limit, (page-1)*limit]);
-    const summary={};for(const [field,missing]of [['total_value','missing_total'],['paid_value','missing_paid'],['balance_value','missing_balance']])summary[field]=Number(count.total)===0?0:Number(totals[missing])>0||totals[field]==null?null:Number(totals[field]);
+    const summary=invoiceFolders.summaryFor(count.total,totals);
+    res.set?.('Cache-Control','no-store');
     return res.json({ invoices: rows.map(invoiceSummary.applyPaymentSummary), total: Number(count.total), page, limit,summary });
   } catch (error) { return invoiceError(res,error); }
+};
+
+exports.getInvoiceFolders = async (req,res) => {
+  try {
+    await ensureInvoiceColumns();
+    const folders=await invoiceFolders.listFolders(pool,req.query,req.user);
+    res.set?.('Cache-Control','no-store');
+    return res.json(folders);
+  } catch(error) { return invoiceError(res,error); }
 };
 
 exports.getInvoiceDetails = async (req, res) => {

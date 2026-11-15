@@ -3,6 +3,9 @@
 // Real parser fixtures. All business data below is synthetic and no database,
 // external OCR service, network connection or mail recipient is used.
 const assert = require('node:assert/strict');
+const { readFileSync } = require('node:fs');
+const { join } = require('node:path');
+const { createHash } = require('node:crypto');
 const XLSX = require('xlsx');
 const PDFDocument = require('pdfkit');
 const { createCanvas } = require('@napi-rs/canvas');
@@ -57,13 +60,14 @@ function imageFixture(format = 'png') {
   return canvas.toBuffer(format === 'jpeg' ? 'image/jpeg' : 'image/png');
 }
 function ocrImageFixture() {
-  const canvas = createCanvas(1100, 340), context = canvas.getContext('2d');
-  context.fillStyle = '#ffffff'; context.fillRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = '#000000'; context.font = '42px sans-serif';
-  context.fillText('FIXTURE QUOTATION', 35, 65);
-  context.fillText('Description        Quantity', 35, 140);
-  context.fillText('Fixture steel plate       2', 35, 215);
-  return canvas.toBuffer('image/png');
+  // The source itself must be identical on every runner. Runtime font lookup
+  // is unrelated to OCR and can otherwise turn this scan into an empty image.
+  // Keep exercising the actual decoder, Tesseract and scanned-PDF pipeline.
+  const source = readFileSync(join(__dirname, 'fixtures', 'procurement-ocr-quotation.png'));
+  assert.equal(createHash('sha256').update(source).digest('hex'), 'fb072f0097ebc4b49be5d4f0f2c1c0bd2d5386c8a44e5821fa295890ec033edb', 'Use the reviewed immutable synthetic OCR source.');
+  assert.equal(source.readUInt32BE(16), 1100);
+  assert.equal(source.readUInt32BE(20), 340);
+  return source;
 }
 function scannedPdfFixture(png, pages = 1, withNativeText = false) {
   const doc = new PDFDocument({ size: 'A4', margin: 32 }), chunks = [];

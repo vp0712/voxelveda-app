@@ -1,7 +1,14 @@
 let vvClientUser={};
-let clientRequestBusy=false,clientRecordEpoch=0;
+let clientRequestBusy=false,clientRecordEpoch=0,clientInvoiceCompanyFolderPanel=null;
 const clientRecordState={RFQ:{page:1,search:''},Invoice:{page:1,search:''}};
 const clientOwner=()=>String(vvClientUser.id||'')+':'+String(localStorage.getItem('user')||'');
+const clientInvoiceSelectedFolder=()=>new URLSearchParams(location.search).get('invoice_folder')||'';
+function selectClientInvoiceCompanyFolder(folder){
+ const url=new URL(location.href);if(folder)url.searchParams.set('invoice_folder',folder);else url.searchParams.delete('invoice_folder');
+ if(url.href!==location.href)history.pushState({...history.state},'',url);
+ clientRecordState.Invoice.page=1;return loadClientRecords();
+}
+
 
 async function clientJson(res){try{return await res.json()}catch{return {}}}
 
@@ -71,12 +78,15 @@ async function loadClientRecords(){
   const epoch=++clientRecordEpoch,owner=clientOwner();
   const permissions=[...(Array.isArray(vvClientUser.permissions)?vvClientUser.permissions:[]),...(Array.isArray(vvClientUser.effective_permissions)?vvClientUser.effective_permissions:[])];
   const sources=[];if(permissions.includes('VIEW_RFQS')||permissions.includes('rfqs'))sources.push(['/api/rfq','rfqs','RFQ']);if(permissions.includes('VIEW_FINANCE')||permissions.includes('finance'))sources.push(['/api/invoice','invoices','Invoice']);
-  const panel=document.getElementById('clientRecords'),list=document.getElementById('clientRecordList');list.replaceChildren();panel.hidden=!sources.length;
+  const panel=document.getElementById('clientRecords'),list=document.getElementById('clientRecordList');clientInvoiceCompanyFolderPanel?.destroy();clientInvoiceCompanyFolderPanel=null;list.replaceChildren();panel.hidden=!sources.length;
   for(const [url,key,label]of sources){
     const section=document.createElement('section'),heading=document.createElement('h3');heading.textContent=label==='RFQ'?'RFQs & quotations':'Invoices & documents';section.append(heading);list.append(section);
-    const state=clientRecordState[label],form=document.createElement('form'),input=document.createElement('input'),search=document.createElement('button');input.type='search';input.value=state.search;input.maxLength=120;input.setAttribute('aria-label','Search '+label+' records');search.type='submit';search.textContent='Search';search.dataset.vvActionIcon='search';search.title='Search '+label+' records';form.append(input,search);section.append(form);form.onsubmit=event=>{event.preventDefault();state.search=input.value.trim();state.page=1;loadClientRecords();};
+    const state=clientRecordState[label];
+    if(label==='Invoice'&&window.VoxelInvoiceFolders){const host=document.createElement('div');host.id='clientInvoiceCompanyFolders';host.dataset.invoiceFolders='';section.append(host);clientInvoiceCompanyFolderPanel=VoxelInvoiceFolders.create({host,selection:clientInvoiceSelectedFolder,owner:clientOwner,query:()=>new URLSearchParams(state.search?{search:state.search}:{}),onSelect:selectClientInvoiceCompanyFolder});clientInvoiceCompanyFolderPanel?.refresh();}
+    const selectedFolder=label==='Invoice'?clientInvoiceSelectedFolder():'';
+    const form=document.createElement('form'),input=document.createElement('input'),search=document.createElement('button');input.type='search';input.value=state.search;input.maxLength=120;input.setAttribute('aria-label','Search '+label+' records');search.type='submit';search.textContent='Search';search.dataset.vvActionIcon='search';search.title='Search '+label+' records';form.append(input,search);section.append(form);form.onsubmit=event=>{event.preventDefault();state.search=input.value.trim();state.page=1;loadClientRecords();};
     const loading=document.createElement('p');loading.textContent='Loading authorised records…';loading.setAttribute('role','status');section.append(loading);
-    try{const params=new URLSearchParams({page:String(state.page),limit:'20',...(state.search?{[label==='RFQ'?'q':'search']:state.search}:{})});const response=await fetch(url+'?'+params,{credentials:'same-origin',cache:'no-store'});const data=await clientJson(response);if(epoch!==clientRecordEpoch||owner!==clientOwner())return;if(!response.ok)throw new Error(response.status===403?'These records are restricted for this account.':data.message||'These records could not be loaded.');const rows=Array.isArray(data)?data:data[key]||data.rows||[];loading.remove();
+    try{const params=new URLSearchParams({page:String(state.page),limit:'20',...(state.search?{[label==='RFQ'?'q':'search']:state.search}:{})});if(selectedFolder)params.set('folder',selectedFolder);const response=await fetch(url+'?'+params,{credentials:'same-origin',cache:'no-store'});const data=await clientJson(response);if(epoch!==clientRecordEpoch||owner!==clientOwner())return;if(!response.ok)throw new Error(response.status===403?'These records are restricted for this account.':data.message||'These records could not be loaded.');const rows=Array.isArray(data)?data:data[key]||data.rows||[];if(!Array.isArray(rows))throw new Error('These records returned an unreadable response. Please retry.');const availablePages=Math.max(1,Math.ceil(Number(data.total||rows.length)/20));if(state.page>availablePages){state.page=availablePages;return loadClientRecords();}loading.remove();
       const info=document.createElement('p');info.textContent=Number.isSafeInteger(Number(data.total))?`${data.total} matching records · Page ${state.page}`:`${rows.length} records on this page`;section.append(info);
       if(!rows.length){const empty=document.createElement('p');empty.textContent='No authorised records match this search.';section.append(empty);}
       for(const row of rows){const item=document.createElement('article');item.className='client-record';const title=document.createElement('strong');title.textContent=`${label} ${row.rfq_no||row.invoice_no||row.id}`;const status=document.createElement('p');status.textContent=String(row.status||'Recorded').replaceAll('_',' ');item.append(title,status);if(label==='Invoice'&&Number.isSafeInteger(Number(row.id))){const actions=document.createElement('div');actions.className='vv-action-toolbar';const link=document.createElement('button');link.type='button';link.textContent='View PDF';link.dataset.vvActionIcon='pdf';link.title='View invoice '+(row.invoice_no||row.id)+' PDF';link.onclick=async()=>{try{await window.VoxelOperations.openPdf(`/api/invoice/${Number(row.id)}/pdf`);}catch(error){clientStatus(error.message,'error');}};actions.append(link);item.append(actions);}section.append(item);}
@@ -84,4 +94,5 @@ async function loadClientRecords(){
     }catch(error){if(epoch!==clientRecordEpoch||owner!==clientOwner())return;loading.textContent=error.message;loading.setAttribute('role','alert');const retry=document.createElement('button');retry.type='button';retry.textContent='Retry '+label+' records';retry.dataset.vvActionIcon='refresh';retry.title=retry.textContent;retry.onclick=loadClientRecords;section.append(retry);}
   }
 }
-window.addEventListener('storage',event=>{if(!event.key||['user','token'].includes(event.key)){clientRecordEpoch++;document.getElementById('clientRecordList')?.replaceChildren();}});
+window.addEventListener('popstate',()=>{if(vvClientUser.id){clientRecordState.Invoice.page=1;loadClientRecords();}});
+window.addEventListener('storage',event=>{if(!event.key||['user','token'].includes(event.key)){clientRecordEpoch++;clientInvoiceCompanyFolderPanel?.destroy();clientInvoiceCompanyFolderPanel=null;document.getElementById('clientRecordList')?.replaceChildren();}});

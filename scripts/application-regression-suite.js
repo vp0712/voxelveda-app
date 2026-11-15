@@ -71,6 +71,7 @@ const checks = [
   'procurement-workflow-test.js',
   'invoice-workflow-regression-test.js',
   'invoice-summary-test.js',
+  'invoice-folder-test.js',
   'document-pdf-delivery-test.js',
   'document-delivery-lifecycle-test.js',
   'document-module-isolation-test.js',

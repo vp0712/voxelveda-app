@@ -591,55 +591,56 @@ async function openStaffInvoicePdf(id) {
   }
 }
 
-async function loadStaffInvoices() {
-  if (!hasPermission('invoices')) return;
-  const tbody = document.getElementById('staffInvoiceTableBody');
-  if (!tbody) return;
-
-  tbody.innerHTML = '<tr><td colspan="8">Loading invoices...</td></tr>';
-
-  try {
-    const res = await fetch('/api/invoice', { headers: { Authorization: `Bearer ${token}` } });
-    const data = await safeJson(res);
-    if (!res.ok) {
-      tbody.innerHTML = `<tr><td colspan="8">${escapeHtml(data.message || 'Failed to load invoices')}</td></tr>`;
-      return;
-    }
-
-    const search = document.getElementById('staffInvoiceSearch')?.value || '';
-    const rows = (data.invoices || []).filter((row) => staffMatchesSearch(row, search, ['invoice_no', 'customer_name', 'customer_email', 'rfq_id', 'status', 'payment_state']));
-
-    const totals = rows.reduce((acc, invoice) => {
-      acc.total += Number(invoice.total || 0);
-      acc.paid += Number(invoice.paid_amount || 0);
-      acc.debt += Number(invoice.balance_due || 0);
-      return acc;
-    }, { total: 0, paid: 0, debt: 0 });
-
-    setText('staffInvoiceTotal', formatMoney(totals.total));
-    setText('staffInvoicePaid', formatMoney(totals.paid));
-    setText('staffInvoiceDebt', formatMoney(totals.debt));
-
-    if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="8">No invoices found for this view.</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = rows.map((invoice) => `
-      <tr>
-        <td><strong>${escapeHtml(invoice.invoice_no || `INV-${invoice.id}`)}</strong></td>
-        <td>${escapeHtml(invoice.customer_name || '-')}<br><span class="muted-text">${escapeHtml(invoice.customer_email || '-')}</span></td>
-        <td>${escapeHtml(invoice.rfq_id || 'Manual')}</td>
-        <td><strong>${escapeHtml(formatMoney(invoice.total))}</strong></td>
-        <td>${escapeHtml(formatMoney(invoice.paid_amount))}</td>
-        <td>${escapeHtml(formatMoney(invoice.balance_due))}</td>
-        <td>${staffStatusBadge(invoice.payment_state || invoice.status)}</td>
-        <td><button class="icon-btn" data-vv-action-icon="pdf" type="button" onclick="return openStaffInvoicePdf(${Number(invoice.id)})">PDF</button></td>
-      </tr>
-    `).join('');
-  } catch {
-    tbody.innerHTML = '<tr><td colspan="8">Failed to load invoices</td></tr>';
-  }
+let staffInvoicePage=1,staffInvoicePages=1,staffInvoiceLoadSequence=0,staffInvoiceCompanyFolderPanel=null,staffInvoiceSearchTimer;
+const staffInvoiceSelectedFolder=()=>new URLSearchParams(location.search).get('invoice_folder')||'';
+const staffInvoiceFolderOwner=()=>String(currentUser?.id||'')+':'+String(localStorage.getItem('user')||'');
+function staffInvoiceQuery(){const search=document.getElementById('staffInvoiceSearch')?.value.trim()||'';return new URLSearchParams(search?{search}:{});}
+function selectStaffInvoiceCompanyFolder(folder){
+ const url=new URL(location.href);url.searchParams.set('view','invoices');
+ if(folder)url.searchParams.set('invoice_folder',folder);else url.searchParams.delete('invoice_folder');
+ if(url.href!==location.href)history.pushState({...history.state},'',url);
+ return loadStaffInvoices(1);
+}
+function ensureStaffInvoiceCompanyFolders(){
+ if(!staffInvoiceCompanyFolderPanel&&window.VoxelInvoiceFolders)staffInvoiceCompanyFolderPanel=VoxelInvoiceFolders.create({host:document.getElementById('staffInvoiceCompanyFolders'),
+  selection:staffInvoiceSelectedFolder,owner:staffInvoiceFolderOwner,headers:authHeaders,query:staffInvoiceQuery,onSelect:selectStaffInvoiceCompanyFolder});
+ return staffInvoiceCompanyFolderPanel;
+}
+function staffInvoiceMoney(value){return value===null||value===undefined||value===''||!Number.isFinite(Number(value))?'Not available':formatMoney(value)+' AUD';}
+function searchStaffInvoices(){clearTimeout(staffInvoiceSearchTimer);staffInvoicePage=1;staffInvoiceLoadSequence++;staffInvoiceSearchTimer=setTimeout(()=>loadStaffInvoices(1),200);}
+window.addEventListener('popstate',()=>{const section=document.getElementById('staffInvoiceSection');if(!section)return;
+ if(new URLSearchParams(location.search).get('view')==='invoices'&&section.classList.contains('hidden-section'))goStaffSection('staffInvoiceSection');
+ else if(!section.classList.contains('hidden-section'))loadStaffInvoices(1);
+});
+window.addEventListener('storage',event=>{if(!event.key||['user','token'].includes(event.key)){
+ staffInvoiceLoadSequence++;staffInvoicePage=1;staffInvoiceCompanyFolderPanel?.invalidate();document.getElementById('staffInvoiceTableBody')?.replaceChildren();
+ ['staffInvoiceTotal','staffInvoicePaid','staffInvoiceDebt'].forEach(id=>setText(id,'Not available'));setText('staffInvoicePageInfo','Confirm the signed-in account, then refresh invoices.');
+}});
+async function loadStaffInvoices(page=staffInvoicePage) {
+ if(!hasPermission('invoices'))return;
+ const tbody=document.getElementById('staffInvoiceTableBody');if(!tbody)return;
+ const sequence=++staffInvoiceLoadSequence,owner=staffInvoiceFolderOwner(),folder=staffInvoiceSelectedFolder();
+ staffInvoicePage=Math.max(1,Number.isSafeInteger(Number(page))?Number(page):1);
+ ensureStaffInvoiceCompanyFolders()?.refresh();
+ tbody.innerHTML='<tr><td colspan="8">Loading invoices…</td></tr>';
+ ['staffInvoiceTotal','staffInvoicePaid','staffInvoiceDebt'].forEach(id=>setText(id,'Loading…'));setText('staffInvoicePageInfo','Loading invoices…');
+ for(const id of ['staffInvoicePrevious','staffInvoiceNext']){const button=document.getElementById(id);if(button)button.disabled=true;}
+ const query=staffInvoiceQuery();query.set('page',String(staffInvoicePage));query.set('limit','25');query.set('sort','date');query.set('direction','asc');if(folder)query.set('folder',folder);
+ try{
+  const response=await fetch('/api/invoice?'+query,{headers:authHeaders(),credentials:'same-origin',cache:'no-store'}),data=await safeJson(response);
+  if(sequence!==staffInvoiceLoadSequence||owner!==staffInvoiceFolderOwner()||folder!==staffInvoiceSelectedFolder())return;
+  if(!response.ok||!Array.isArray(data.invoices)||!Number.isSafeInteger(Number(data.total))||Number(data.total)<0)throw new Error(data.message||'Invoices could not be loaded.');
+  const total=Number(data.total),rows=data.invoices;staffInvoicePages=Math.max(1,Math.ceil(total/25));
+  if(staffInvoicePage>staffInvoicePages)return loadStaffInvoices(staffInvoicePages);
+  setText('staffInvoiceTotal',staffInvoiceMoney(data.summary?.total_value));setText('staffInvoicePaid',staffInvoiceMoney(data.summary?.paid_value));setText('staffInvoiceDebt',staffInvoiceMoney(data.summary?.balance_value));
+  setText('staffInvoicePageInfo',`${total?((staffInvoicePage-1)*25+1):0}–${Math.min(staffInvoicePage*25,total)} of ${total} matching invoices · Page ${staffInvoicePage} of ${staffInvoicePages}`);
+  const previous=document.getElementById('staffInvoicePrevious'),next=document.getElementById('staffInvoiceNext');if(previous)previous.disabled=staffInvoicePage<=1;if(next)next.disabled=staffInvoicePage>=staffInvoicePages;
+  tbody.innerHTML=rows.length?rows.map(invoice=>`<tr data-invoice-id="${Number(invoice.id)}"><td><strong>${escapeHtml(invoice.invoice_no||`INV-${invoice.id}`)}</strong></td><td>${escapeHtml(invoice.customer_name||'Company not recorded')}<br><span class="muted-text">${escapeHtml(invoice.customer_email||'Email not recorded')}</span></td><td>${escapeHtml(invoice.rfq_id||'Manual')}</td><td><strong>${escapeHtml(staffInvoiceMoney(invoice.total))}</strong></td><td>${escapeHtml(staffInvoiceMoney(invoice.paid_amount))}</td><td>${escapeHtml(staffInvoiceMoney(invoice.balance_due))}</td><td>${staffStatusBadge(invoice.payment_state||invoice.status)}</td><td><button class="icon-btn" data-vv-action-icon="pdf" type="button" onclick="return openStaffInvoicePdf(${Number(invoice.id)})">PDF</button></td></tr>`).join(''):'<tr><td colspan="8">No invoices match this company folder or search.</td></tr>';
+ }catch(error){
+  if(sequence!==staffInvoiceLoadSequence||owner!==staffInvoiceFolderOwner()||folder!==staffInvoiceSelectedFolder())return;
+  tbody.innerHTML=`<tr><td colspan="8"><p role="alert">${escapeHtml(error.message||'Invoices could not be loaded.')}</p><button type="button" class="secondary-btn" data-vv-action-icon="refresh" onclick="loadStaffInvoices()">Retry invoices</button></td></tr>`;
+  ['staffInvoiceTotal','staffInvoicePaid','staffInvoiceDebt'].forEach(id=>setText(id,'Not available'));setText('staffInvoicePageInfo','Invoices are unavailable. Retry to refresh the register.');
+ }
 }
 
 async function loadStaffCustomers() {

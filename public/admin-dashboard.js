@@ -2686,7 +2686,36 @@ async function invoiceAction(invoiceId, action) {
   }
 }
 
-let invoiceLoadSequence=0;
+let invoiceLoadSequence=0, invoiceCompanyFolderPanel=null;
+const invoiceFolderOwner=()=>String(currentUser?.id||'')+':'+String(localStorage.getItem('user')||'');
+function invoiceCompanyFolderQuery(){
+ const state=registerPagerState.invoices||{},filters=registerFilters.invoices||{},query=new URLSearchParams();
+ if(state.search||filters.search)query.set('search',state.search||filters.search);
+ if(state.status||filters.status)query.set('status',state.status||filters.status);
+ if(filters.from)query.set('from',filters.from);if(filters.to)query.set('to',filters.to);
+ if(filters.payment_state)query.set('payment_state',filters.payment_state);
+ if(state.archived||filters.archived===true||filters.archived==='true')query.set('archived','true');
+ return query;
+}
+function selectInvoiceCompanyFolder(folder){
+ const next={...(registerFilters.invoices||{})};
+ if(folder)next.folder=folder;else delete next.folder;
+ registerFilters.invoices=next;
+ registerPagerState.invoices={...(registerPagerState.invoices||{}),page:1};
+ trackAdminNavigation('invoiceSection');
+ return loadInvoices();
+}
+function ensureInvoiceCompanyFolders(){
+ if(!invoiceCompanyFolderPanel&&window.VoxelInvoiceFolders)invoiceCompanyFolderPanel=VoxelInvoiceFolders.create({
+  host:document.getElementById('invoiceCompanyFolders'),selection:()=>registerFilters.invoices?.folder||'',
+  owner:invoiceFolderOwner,headers:authHeaders,query:invoiceCompanyFolderQuery,onSelect:selectInvoiceCompanyFolder
+ });
+ return invoiceCompanyFolderPanel;
+}
+window.addEventListener('storage',event=>{if(!event.key||['user','token'].includes(event.key)){
+ invoiceLoadSequence++;invoiceCache=[];invoiceCompanyFolderPanel?.invalidate();document.getElementById('invoiceTableBody')?.replaceChildren();
+ ['invoiceTotalValue','invoiceUnpaidValue','invoiceSentPaidCount'].forEach(id=>setText(id,'Not available'));
+}});
 function invoiceMoney(value){return value===null||value===undefined||value===''||!Number.isFinite(Number(value))?'Not available':formatMoney(value)+' AUD';}
 function invoiceActions(invoice){
   const id=Number(invoice.id),status=String(invoice.status||''),archived=Number(invoice.deleted)===1;
@@ -2701,12 +2730,12 @@ function invoiceActions(invoice){
 }
 async function loadInvoices() {
  const tbody=document.getElementById('invoiceTableBody');if(!tbody)return;
- const sequence=++invoiceLoadSequence;setRegisterLoading(tbody,10,'Loading invoices…');['invoiceTotalValue','invoiceUnpaidValue','invoiceSentPaidCount'].forEach(id=>setText(id,'Loading…'));
+ const sequence=++invoiceLoadSequence,owner=invoiceFolderOwner();ensureInvoiceCompanyFolders()?.refresh();setRegisterLoading(tbody,10,'Loading invoices…');['invoiceTotalValue','invoiceUnpaidValue','invoiceSentPaidCount'].forEach(id=>setText(id,'Loading…'));
  const state=registerPagerState.invoices||{},filters=registerFilters.invoices||{},sort={oldest:['date','asc'],newest:['date','desc'],name:['customer','asc'],status:['status','asc']}[state.sort||'oldest'];
  const query=new URLSearchParams({page:String(state.page||1),limit:String(state.pageSize||25),sort:sort[0],direction:sort[1]});
- if(state.search||filters.search)query.set('search',state.search||filters.search);if(state.status||filters.status)query.set('status',state.status||filters.status);if(filters.from)query.set('from',filters.from);if(filters.to)query.set('to',filters.to);if(state.archived)query.set('archived','true');
+ if(state.search||filters.search)query.set('search',state.search||filters.search);if(state.status||filters.status)query.set('status',state.status||filters.status);if(filters.from)query.set('from',filters.from);if(filters.to)query.set('to',filters.to);if(state.archived||filters.archived===true||filters.archived==='true')query.set('archived','true');if(filters.folder)query.set('folder',filters.folder);if(filters.payment_state)query.set('payment_state',filters.payment_state);
  try{
-  const res=await fetch('/api/invoice?'+query,{headers:authHeaders(),cache:'no-store'}),data=await safeJson(res);if(sequence!==invoiceLoadSequence)return;
+  const res=await fetch('/api/invoice?'+query,{headers:authHeaders(),cache:'no-store'}),data=await safeJson(res);if(sequence!==invoiceLoadSequence||owner!==invoiceFolderOwner())return;
   if(!res.ok||!Array.isArray(data.invoices)||!Number.isFinite(Number(data.total)))throw new Error(data.message||'Invoices could not be loaded.');
   const maxPage=Math.max(1,Math.ceil(Number(data.total)/Number(state.pageSize||25)));if(Number(state.page||1)>maxPage){registerPagerState.invoices={...state,page:maxPage};return loadInvoices();}
   invoiceCache=data.invoices;renderNotificationDropdown();
@@ -2716,9 +2745,9 @@ async function loadInvoices() {
    <td class="register-action-cell invoice-action-cell"><div class="invoice-actions vv-action-toolbar"><button data-vv-action-icon="view" class="primary-btn" onclick="openInvoiceDetail(${Number(invoice.id)})">View invoice</button>${Number(invoice.deleted)!==1?`<button data-vv-action-icon="pdf" class="secondary-btn" onclick="openInvoicePdf(${Number(invoice.id)})">PDF</button>`:''}${invoiceActions(invoice)}</div></td></tr>`});
   const sum=data.summary;
   updateInvoiceMetrics(invoiceCache,sum);
-  const controls=document.querySelector('[data-register-controls="invoices"]');let note=controls.querySelector('.register-filter-note');if(!note){note=document.createElement('p');note.className='register-filter-note';controls.append(note);}note.textContent=`Totals cover all ${Number(data.total)} matching records. ${query.get('search')||query.get('status')||state.archived?'Filters active.':'No active filters.'}`;
+  const controls=document.querySelector('[data-register-controls="invoices"]');let note=controls.querySelector('.register-filter-note');if(!note){note=document.createElement('p');note.className='register-filter-note';controls.append(note);}note.textContent=`Totals cover all ${Number(data.total)} matching records. ${query.get('search')||query.get('status')||query.get('folder')||query.get('from')||query.get('to')||query.get('payment_state')||state.archived?'Filters active.':'No active filters.'}`;
   if(hasCurrentPermission('VOID_TRANSACTION')&&!controls.querySelector('[data-invoice-archive]')){const label=document.createElement('label');label.innerHTML='Records <select data-invoice-archive><option value="">Active</option><option value="archived">Archived</option></select>';controls.querySelector('.register-search-controls').append(label);label.querySelector('select').onchange=event=>{registerPagerState.invoices={...registerPagerState.invoices,page:1,archived:event.target.value==='archived'};loadInvoices();};}
- }catch(error){if(sequence!==invoiceLoadSequence)return;tbody.innerHTML=`<tr><td colspan="10"><p role="alert">${escapeHtml(error.message)}</p><button data-vv-action-icon="refresh" class="secondary-btn" onclick="loadInvoices()">Retry invoices</button></td></tr>`;['invoiceTotalValue','invoiceUnpaidValue','invoiceSentPaidCount'].forEach(id=>setText(id,'Not available'));}
+ }catch(error){if(sequence!==invoiceLoadSequence||owner!==invoiceFolderOwner())return;tbody.innerHTML=`<tr><td colspan="10"><p role="alert">${escapeHtml(error.message)}</p><button data-vv-action-icon="refresh" class="secondary-btn" onclick="loadInvoices()">Retry invoices</button></td></tr>`;['invoiceTotalValue','invoiceUnpaidValue','invoiceSentPaidCount'].forEach(id=>setText(id,'Not available'));}
 }
 function updateInvoiceMetrics(invoices,summary){
  setText('invoiceTotalValue',summary?invoiceMoney(summary.total_value):'Not available');setText('invoiceUnpaidValue',summary?invoiceMoney(summary.balance_value):'Not available');setText('invoiceSentPaidCount',summary?invoiceMoney(summary.paid_value):'Not available');
@@ -6172,7 +6201,7 @@ function getOriginalReportEmailSource(report) {
   const key=report==='raw-materials'?'raw_material':report;
   const state=registerPagerState[key]||{},saved=registerFilters[key]||{};
   const filters={...saved};
-  const allowed={rfqs:['q','status','archived'],invoices:['search','status','payment_state','from','to','archived'],customers:['search'],suppliers:['search'],stock:['search','category','availability'],materials:['type','inventory_type','search','stock_status'],staff:['search','department','role','active'],competitors:['search','category','country'],expenses:['search','supplier','category','status','fy','from','to','id']}[sourceReport]||[];
+  const allowed={rfqs:['q','status','archived'],invoices:['search','status','payment_state','from','to','archived','folder'],customers:['search'],suppliers:['search'],stock:['search','category','availability'],materials:['type','inventory_type','search','stock_status'],staff:['search','department','role','active'],competitors:['search','category','country'],expenses:['search','supplier','category','status','fy','from','to','id']}[sourceReport]||[];
   if(state.search)filters[sourceReport==='rfqs'?'q':'search']=state.search;
   if(state.status)filters.status=state.status;
   if(sourceReport==='rfqs'&&document.getElementById('rfqArchivedFilter')?.checked)filters.archived='true';

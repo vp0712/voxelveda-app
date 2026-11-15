@@ -136,6 +136,31 @@ async function completenessFailures() {
   const invalid = await corrupt.download('stock'); assert.equal(invalid.error.code, 'PDF_DOCUMENT_INVALID'); assert.equal(invalid.res.bytes, undefined); assert.equal(invalid.res.headers['Content-Type'], undefined, 'invalid bytes cannot be presented as a PDF response');
 }
 
+async function invoiceFolderSelection() {
+  const folder = 'a'.repeat(64);
+  const selected = Array.from({length:205}, (_,index) => ({id:index+1000,invoice_no:'FOLDER-INV-'+(index+1),customer_name:'Selected company',customer_email:'selected@example.test',status:'sent',total:'1.00',paid_amount:'0.00',balance_due:'1.00',payment_state:'unpaid',created_at:'2026-11-01'}));
+  const fixture = await reportFixture({sourceHandler(module, req) {
+    if (module !== 'invoice') return null;
+    assert.equal(req.query.folder,folder,'Every report source page must retain the selected folder, never export every company.');
+    assert.equal(req.query.status,'sent');
+    assert.equal(req.user.id,99,'The full authenticated source scope must survive paging.');
+    const page=Number(req.query.page),limit=Number(req.query.limit);
+    return {body:{invoices:selected.slice((page-1)*limit,page*limit),total:selected.length,page,limit}};
+  }});
+  const result=await fixture.download('invoices',{folder,status:'sent',download:'1'});
+  assert.equal(result.error,undefined);
+  const parsed=await pdfService.validatePdf(result.res.bytes,{expectedText:['Selected company','FOLDER-INV-205','AUD 205.00']});
+  assert(parsed.pages>1);assert.doesNotMatch(parsed.text,new RegExp(folder),'Opaque folder keys stay out of the document.');
+  assert.equal(fixture.state.sourceReads.length,3,'The selected folder report covers all pages.');
+  for (const invalid of ['', 'all', 'a'.repeat(63), 'A'.repeat(64), ' '+folder, [folder]]) {
+    const before=fixture.state.sourceReads.length;
+    const blocked=await fixture.download('invoices',{folder:invalid});
+    assert.equal(blocked.error?.status,400);assert.equal(blocked.res.bytes,undefined);
+    assert.equal(fixture.state.sourceReads.length,before,'Invalid folder selection fails before reading business records.');
+  }
+  assert.equal((await fixture.download('customers',{folder})).error?.status,400,'Folder filters are limited to the invoice register.');
+}
+
 async function authoritiesAndFilters() {
   const fixture = await reportFixture();
   for (const type of [...Object.keys(SOURCES).map((module) => ({ rfq: 'rfqs', invoice: 'invoices', customer: 'customers', supplier: 'suppliers', material: 'materials', user: 'staff', competitor: 'competitors', expense: 'expenses' }[module] || module)), 'timesheets']) {
@@ -214,7 +239,7 @@ async function httpDownloadContract() {
 }
 
 async function main() {
-  const evidence = await registerPdfEvidence(); await completenessFailures(); await authoritiesAndFilters(); await attendanceScopesAndDates(); await httpDownloadContract();
+  const evidence = await registerPdfEvidence(); await completenessFailures(); await authoritiesAndFilters(); await invoiceFolderSelection(); await attendanceScopesAndDates(); await httpDownloadContract();
   console.log(`Original report tests passed: ${evidence.evidence.length} original registers plus timesheet PDFs parsed; 205 RFQs across all three source pages; correct units/category/date/time columns and exact money totals; actual HTTP PDF download bytes and metadata; source completeness failures block partial documents; invalid bytes rejected; role/client/own/team/all scope; filtered read-only attendance and roster; no UUID/security metadata in document body. Fixtures: ${evidence.paths[0].replace(/report-rfqs\.pdf$/, '')}`);
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

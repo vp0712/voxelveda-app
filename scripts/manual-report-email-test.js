@@ -137,6 +137,10 @@ async function main() {
     { type: 'register', report: 'rfqs', filters: { q: { bad: true } } }
   ]) assert.throws(() => service._test.descriptor(input), /not supported|not applicable|valid|support manual/);
   assert.deepEqual(service._test.descriptor({ type: 'register', report: 'rfqs', filters: { q: 'Fixture', status: 'pending' } }), { type: 'register', report: 'rfqs', filters: { q: 'Fixture', status: 'pending' } });
+  const folder = 'a'.repeat(64);
+  assert.deepEqual(service._test.descriptor({type:'register',report:'invoices',filters:{folder}}), {type:'register',report:'invoices',filters:{folder}}, 'Email snapshots retain the exact selected company folder.');
+  for (const invalid of ['', 'all', 'a'.repeat(63), 'A'.repeat(64), true]) assert.throws(() => service._test.descriptor({type:'register',report:'invoices',filters:{folder:invalid}}), /valid company invoice folder/);
+  assert.throws(() => service._test.descriptor({type:'register',report:'rfqs',filters:{folder}}), /valid company invoice folder/);
   assert.throws(() => service._test.authorised(permissions('VIEW_RFQS'), { type: 'register', report: 'rfqs' }), { code: 'PERMISSION_DENIED' });
   assert.throws(() => service._test.authorised(permissions('SEND_COMPANY_EMAIL'), { type: 'invoice' }), { code: 'PERMISSION_DENIED' });
   for (const grants of [['VIEW_FINANCE','EDIT_FINANCE'],['VIEW_FINANCE','SEND_COMPANY_EMAIL'],['EDIT_FINANCE','SEND_COMPANY_EMAIL']]) await assert.rejects(() => service.prepare(f.request(permissions(...grants)), { type: 'invoice', record_id: 9 }), { code: 'PERMISSION_DENIED' });
