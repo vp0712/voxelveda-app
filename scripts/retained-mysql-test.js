@@ -487,12 +487,59 @@ async function makeWeeklyFixtureDue(queueId) {
   assert.equal(due.affectedRows, 1, 'Only an immediately queued pending weekly fixture may have its worker due time adjusted.');
 }
 
+// The SQL worker uses real NOW(). Simulate only dispatch/recovery times which
+// have both fully elapsed, including the Monday gap before the07:30+3h case.
+// Calendar-week subtraction preserves Sydney's DST offsets; do not use168h.
+function elapsedWeeklyFixtureClock(realNow,timezone='Australia/Sydney') {
+  const {DateTime}=require('luxon'),policy=require('../services/weeklyTimesheetEligibility');
+  const current=DateTime.fromJSDate(realNow,{zone:timezone});
+  assert(current.isValid,'A valid real clock is required for disposable weekly fixtures.');
+  let dispatch=current.startOf('week').set({hour:7,minute:30,second:0,millisecond:0});
+  if(dispatch.plus({hours:3}).toMillis()>current.toMillis())dispatch=dispatch.minus({weeks:1});
+  const scheduledNow=dispatch.toJSDate(),recoveryNow=dispatch.plus({hours:3}).toJSDate();
+  assert(scheduledNow.getTime()<=realNow.getTime()&&recoveryNow.getTime()<=realNow.getTime(),'Both simulated worker scenarios must have elapsed in real time.');
+  return{period:policy.latestCompletedWeek(scheduledNow,timezone),scheduledNow,recoveryNow};
+}
+function testElapsedWeeklyFixtureClock() {
+  const {DateTime}=require('luxon'),policy=require('../services/weeklyTimesheetEligibility'),timezone='Australia/Sydney';
+  const config=policy.configuration({TIMESHEET_TIMEZONE:timezone,WEEKLY_TIMESHEET_EMAIL_ENABLED:'true',WEEKLY_TIMESHEET_EMAIL_WEEKDAY:'1',WEEKLY_TIMESHEET_EMAIL_HOUR:'7',WEEKLY_TIMESHEET_EMAIL_MINUTE:'0',WEEKLY_TIMESHEET_EMAIL_WINDOW_MINUTES:'120',WEEKLY_TIMESHEET_RECOVERY_HOURS:'48'});
+  const cases=[
+    ['2026-11-15T23:59:59+11:00','2026-11-09','2026-11-02','2026-11-08'],
+    ['2026-11-16T00:00:00+11:00','2026-11-09','2026-11-02','2026-11-08'],
+    ['2026-11-16T06:59:59+11:00','2026-11-09','2026-11-02','2026-11-08'],
+    ['2026-11-16T07:30:00+11:00','2026-11-09','2026-11-02','2026-11-08'],
+    ['2026-11-16T10:29:59+11:00','2026-11-09','2026-11-02','2026-11-08'],
+    ['2026-11-16T10:30:00+11:00','2026-11-16','2026-11-09','2026-11-15'],
+    ['2026-11-16T11:00:00+11:00','2026-11-16','2026-11-09','2026-11-15'],
+    ['2026-10-04T23:59:59+11:00','2026-09-28','2026-09-21','2026-09-27'],
+    ['2026-10-05T00:00:00+11:00','2026-09-28','2026-09-21','2026-09-27'],
+    ['2026-10-05T10:30:00+11:00','2026-10-05','2026-09-28','2026-10-04'],
+    ['2026-04-05T23:59:59+10:00','2026-03-30','2026-03-23','2026-03-29'],
+    ['2026-04-06T00:00:00+10:00','2026-03-30','2026-03-23','2026-03-29'],
+    ['2026-04-06T10:30:00+10:00','2026-04-06','2026-03-30','2026-04-05']
+  ];
+  for(const[wall,dispatchDate,start,end]of cases){
+    const realNow=DateTime.fromISO(wall,{setZone:true}).toJSDate(),clock=elapsedWeeklyFixtureClock(realNow,timezone),localDispatch=DateTime.fromJSDate(clock.scheduledNow,{zone:timezone});
+    assert.equal(localDispatch.toISODate(),dispatchDate,wall);assert.equal(localDispatch.hour,7);assert.equal(localDispatch.minute,30);
+    assert.equal(clock.period.start,start);assert.equal(clock.period.end,end);
+    assert.equal(policy.scheduleWindow(clock.scheduledNow,config).eligible,true);
+    assert.equal(policy.scheduleWindow(clock.recoveryNow,config).eligible,false);
+    assert.equal(policy.recoveryWindow(clock.recoveryNow,config).eligible,true);
+    assert.equal(policy.latestCompletedWeek(clock.recoveryNow,timezone).start,start,'The source and simulated worker retain the same completed reporting week.');
+  }
+  const spring=elapsedWeeklyFixtureClock(new Date('2026-10-04T23:30:00Z'),timezone),autumn=elapsedWeeklyFixtureClock(new Date('2026-04-06T00:30:00Z'),timezone);
+  assert.equal(spring.scheduledNow.toISOString(),'2026-10-04T20:30:00.000Z');assert.equal(autumn.scheduledNow.toISOString(),'2026-04-05T21:30:00.000Z');
+  assert.equal((Date.parse(spring.period.endExclusiveUtc)-Date.parse(spring.period.startUtc))/3600000,167);
+  assert.equal((Date.parse(autumn.period.endExclusiveUtc)-Date.parse(autumn.period.startUtc))/3600000,169);
+}
+
 async function testWeeklyDelivery() {
   // Keep real MySQL source/cache metadata, scheduler locks, renderer, parser and
   // queue serialization. Only the private object provider is local to this
   // disposable fixture; never invent credentials or contact a production bucket.
   const storage = require('../services/objectStorageService');
   const originalStorage = { putObject: storage.putObject, getObject: storage.getObject, deleteObject: storage.deleteObject };
+  const validatorRestorations=[];
   const objects = new Map();
   const fixtureKey = key => assert.match(String(key), /^timesheet-pdfs\/[a-f0-9]{64}\/[a-f0-9]{64}\.pdf$/, 'Weekly fixture accesses only its content-addressed PDF objects.');
   storage.putObject = async (key, bytes, type) => { fixtureKey(key); assert.equal(type, 'application/pdf'); assert(Buffer.isBuffer(bytes)); objects.set(key, Buffer.from(bytes)); return { key, size: bytes.length }; };
@@ -511,8 +558,23 @@ async function testWeeklyDelivery() {
   process.env.WEEKLY_TIMESHEET_EMAIL_MINUTE = '0';
   process.env.WEEKLY_TIMESHEET_EMAIL_WINDOW_MINUTES = '120';
   delete process.env.ATTENDANCE_STORAGE_TIMEZONE;
-  const period = policy.latestCompletedWeek(new Date(), 'Australia/Sydney');
-  const scheduledNow = DateTime.fromISO(period.end, { zone: 'Australia/Sydney' }).plus({ days: 1 }).set({ hour: 7, minute: 30 }).toJSDate();
+  testElapsedWeeklyFixtureClock();
+  const {period,scheduledNow,recoveryNow}=elapsedWeeklyFixtureClock(new Date(),'Australia/Sydney');
+  let fixtureWorkerNow=scheduledNow;
+  const fixtureKeys=new Set([30,33].flatMap(id=>[1,2].map(version=>'weekly-timesheet:'+id+':'+period.start+':'+period.end+':v'+version)));
+  const validationClocks=[];
+  const bindFixtureWorkerClock=service=>{
+    const validate=service.validateQueuedWeeklyDelivery;
+    service.validateQueuedWeeklyDelivery=(row,db,options={})=>{
+      const key=String(row.idempotency_key||'');
+      if(row.related_module==='timesheets'&&fixtureKeys.has(key)){
+        validationClocks.push({key,now:fixtureWorkerNow.toISOString()});
+        return validate(row,db,{...options,now:fixtureWorkerNow,env:process.env});
+      }
+      return validate(row,db,options);
+    };
+    validatorRestorations.push(()=>{service.validateQueuedWeeklyDelivery=validate;});
+  };
   await pool.query(`INSERT INTO users(id,name,username,email,password,role,permissions,active,employee_number,timesheet_delivery_email) VALUES
     (30,'Worked fixture employee','worked-fixture','login-only-30@example.invalid','not-a-login-hash','staff',JSON_ARRAY(),1,'FIXTURE-STAFF-30','weekly-30@example.invalid'),
     (31,'No-work fixture employee','no-work-fixture','login-only-31@example.invalid','not-a-login-hash','staff',JSON_ARRAY(),1,'FIXTURE-STAFF-31','weekly-31@example.invalid'),
@@ -528,6 +590,7 @@ async function testWeeklyDelivery() {
   }
   delete require.cache[require.resolve('../services/weeklyTimesheetScheduler')];
   let scheduler = require('../services/weeklyTimesheetScheduler');
+  bindFixtureWorkerClock(scheduler);
   const options = { now: scheduledNow, env: process.env };
   await Promise.all([scheduler.queueClosedWeekTimesheets(options), scheduler.queueClosedWeekTimesheets(options)]);
   const [deliveries] = await pool.query('SELECT * FROM weekly_timesheet_deliveries WHERE period_start=? AND period_end=? ORDER BY user_id', [period.start, period.end]);
@@ -586,6 +649,7 @@ async function testWeeklyDelivery() {
   assert.deepEqual(htmlUnchanged, { content_sha256: worked.content_sha256, content_snapshot_json: worked.content_snapshot_json, document_request_id: null }, 'Optional PDF processing never rewrites the immutable HTML message or its format.');
   delete require.cache[require.resolve('../services/weeklyTimesheetScheduler')];
   scheduler = require('../services/weeklyTimesheetScheduler');
+  bindFixtureWorkerClock(scheduler);
   await scheduler.queueClosedWeekTimesheets(options);
   const [[queueCount]] = await pool.query("SELECT COUNT(*) AS count FROM email_queue WHERE idempotency_key LIKE ?", [`weekly-timesheet:30:${period.start}:${period.end}:v%`]);
   assert.equal(queueCount.count, 1, 'Concurrent and restarted schedulers produce exactly one immutable staff/week queue.');
@@ -621,7 +685,7 @@ async function testWeeklyDelivery() {
   assert.equal(heldDelivery.status, 'REVIEW_REQUIRED');
   // Resolve only the synthetic missing-recipient fixture after the normal window.
   await pool.query("UPDATE users SET email='registered-33@example.invalid' WHERE id=33");
-  const recoveryNow=DateTime.fromJSDate(scheduledNow).plus({hours:3}).toJSDate();
+  fixtureWorkerNow=recoveryNow;
   assert.equal(policy.scheduleWindow(recoveryNow,policy.configuration(process.env)).eligible,false);
   const recovered=await Promise.all([scheduler.queueClosedWeekTimesheets({...options,now:recoveryNow}),scheduler.queueClosedWeekTimesheets({...options,now:recoveryNow})]);
   assert.equal(recovered.reduce((sum,result)=>sum+result.queued,0),1);
@@ -635,9 +699,16 @@ async function testWeeklyDelivery() {
   const reconciled=await require('../services/weeklyTimesheetReconciliation').reconcileWeek({db:pool,now:recoveryNow,env:process.env,actor:{id:20,role:'admin'}});
   const reconciledStaff=reconciled.outcomes.find(entry=>entry.user_id===33);
   assert.equal(reconciledStaff.status,'PROVIDER_ACCEPTED');assert.equal(reconciledStaff.recipient_verified,false);assert.equal(reconciledStaff.delivery_format,'HTML');assert.equal(reconciledStaff.report.status,'PREPARED');
+  for(const[id,version,at]of[[30,1,scheduledNow],[30,2,scheduledNow],[33,1,recoveryNow]]){
+    const calls=validationClocks.filter(item=>item.key==='weekly-timesheet:'+id+':'+period.start+':'+period.end+':v'+version);
+    assert.equal(calls.length,1,'Each exact fixture queue delegates to the real validator once.');
+    assert.equal(calls[0].now,at.toISOString(),'Only the explicit fixture transaction uses its elapsed dispatch/recovery clock.');
+  }
+  facts.push('pure Sunday/Monday00/pre07/pre1030/post1030 and Sydney DST167/169-hour fixture timing; both dispatch/recovery elapsed before real NOW with exact source-bound worker clock injection and unchanged due guard');
   facts.push('real InnoDB bounded missed-window recovery after registered-account-address correction; concurrent workers queue once; persisted generation budget and one audit; reconciled PDF/queue/provider states without claiming receipt');
   facts.push('real worked-only HTML scheduling/source-content locks, zero-attachment immutable bodies, independent optional PDF failure/storage, staff-period/version uniqueness, restart deduplication, accepted history preservation, explicit revision and final recipient-change hold');
   } finally {
+    for(const restore of validatorRestorations.reverse())restore();
     Object.assign(storage, originalStorage);
     objects.clear();
     for (const [name, method] of Object.entries(originalStorage)) assert.equal(storage[name], method, 'The private fixture adapter must not leak into another workflow.');
