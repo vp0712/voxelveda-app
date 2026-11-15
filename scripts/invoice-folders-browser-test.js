@@ -233,6 +233,61 @@ async function searchInvoices(state, type, search) {
   if (type === 'client') await input.locator('..').locator('button[type=submit]').click();
   await response;
 }
+function colorChannels(value) {
+  const channels = String(value).match(/[\d.]+/g)?.map(Number);
+  assert(channels?.length >= 3 && channels.every(Number.isFinite), 'A real computed RGB colour is required: ' + value);
+  assert(channels.length < 4 || channels[3] === 1, 'The tested icon, surface and boundary must be opaque: ' + value);
+  return channels.slice(0, 3);
+}
+function graphicalContrast(foreground, background) {
+  const luminance = value => colorChannels(value).map(channel => channel / 255)
+    .map(channel => channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4)
+    .reduce((sum, channel, index) => sum + channel * [.2126, .7152, .0722][index], 0);
+  const a = luminance(foreground), b = luminance(background);
+  return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
+}
+async function verifyFolderSearchContrast(state, type, width, theme) {
+  const button = state.host.locator('.vv-invoice-folder-search > button[type="submit"]'), observations = [];
+  await state.page.mouse.move(0, 0);
+  await button.evaluate(node => node.blur());
+  for (const mode of ['normal', 'keyboard-focus']) {
+    if (mode === 'keyboard-focus') { await state.page.keyboard.press('Tab'); await button.focus(); }
+    const observed = await button.evaluate(node => {
+      const style = getComputedStyle(node), glyph = getComputedStyle(node, '::before');
+      let parentSurface = null;
+      for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+        const value = getComputedStyle(parent).backgroundColor, channels = value.match(/[\d.]+/g)?.map(Number);
+        if (channels?.length === 3 || channels?.length === 4 && channels[3] === 1) { parentSurface = value; break; }
+      }
+      return { foreground: style.color, background: style.backgroundColor, border: style.borderTopColor,
+        borderStyle: style.borderTopStyle, borderWidth: parseFloat(style.borderTopWidth),
+        glyph: { color: glyph.backgroundColor, mask: glyph.maskImage, webkitMask: glyph.webkitMaskImage,
+          opacity: Number(glyph.opacity), width: parseFloat(glyph.width), height: parseFloat(glyph.height) },
+        focusVisible: node.matches(':focus-visible'), outline: style.outlineColor,
+        outlineStyle: style.outlineStyle, outlineWidth: parseFloat(style.outlineWidth), parentSurface };
+    });
+    const label = `${type} ${width}px ${theme} ${mode}: `;
+    assert([observed.glyph.mask, observed.glyph.webkitMask].some(value => value && value !== 'none') &&
+      observed.glyph.opacity === 1 && observed.glyph.width >= 16 && observed.glyph.height >= 16,
+    label + 'the search control must render its actual visible graphical icon.');
+    const iconRatio = graphicalContrast(observed.glyph.color, observed.background);
+    const foregroundRatio = graphicalContrast(observed.foreground, observed.background);
+    const borderRatio = graphicalContrast(observed.border, observed.background);
+    assert(iconRatio >= 3 && foregroundRatio >= 3, label + 'search icon contrast must be at least 3:1: ' + JSON.stringify(observed));
+    assert(observed.borderStyle !== 'none' && observed.borderWidth >= 1 && borderRatio >= 3,
+      label + 'search boundary contrast must be at least 3:1: ' + JSON.stringify(observed));
+    let outlineRatio = null;
+    if (mode === 'keyboard-focus') {
+      outlineRatio = graphicalContrast(observed.outline, observed.parentSurface);
+      assert(observed.focusVisible && observed.outlineStyle !== 'none' && observed.outlineWidth >= 2 && outlineRatio >= 3,
+        label + 'keyboard focus must have a visible contrasting outline: ' + JSON.stringify(observed));
+    }
+    observations.push({ mode, icon_ratio: iconRatio, foreground_ratio: foregroundRatio,
+      border_ratio: borderRatio, outline_ratio: outlineRatio, computed: observed });
+  }
+  await button.evaluate(node => node.blur());
+  return observations;
+}
 async function responsive(state, type, proof) {
   const widths = type === 'admin' ? [320, 360, 390, 430, 768, 1024, 1440] : [320, 390, 768, 1440];
   for (const width of widths) for (const theme of ['light', 'dark']) {
@@ -246,7 +301,9 @@ async function responsive(state, type, proof) {
       assert(control.width >= 44 && control.height >= 44,
         `${type} ${width}px ${theme}: ${JSON.stringify(control)} must retain a 44px touch target.`);
     }
-    proof.layouts.push({ portal: type, width, theme, no_page_overflow: true, accessible_controls: controls.length });
+    const searchContrast = await verifyFolderSearchContrast(state, type, width, theme);
+    proof.layouts.push({ portal: type, width, theme, no_page_overflow: true, accessible_controls: controls.length,
+      search_control_contrast: searchContrast });
     if ([390, 1440].includes(width)) {
       await state.host.scrollIntoViewIfNeeded();
       await state.page.waitForFunction(() => !document.getElementById('vvGlobalBrandLoader')?.classList.contains('is-visible'));
