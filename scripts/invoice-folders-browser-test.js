@@ -90,8 +90,8 @@ async function makeServer() {
   });
 }
 const surfaces = {
-  admin: { id: 9881, route: '/admin', section: 'invoiceSection', host: '#invoiceCompanyFolders', rows: '#invoiceTableBody tr[data-invoice-id]', table: '#invoiceTableBody' },
-  staff: { id: 9882, route: '/portal/staff', section: 'staffInvoiceSection', host: '#staffInvoiceCompanyFolders', rows: '#staffInvoiceTableBody tr', table: '#staffInvoiceTableBody' },
+  admin: { id: 9881, route: '/admin?view=invoices', section: 'invoiceSection', host: '#invoiceCompanyFolders', rows: '#invoiceTableBody tr[data-invoice-id]', table: '#invoiceTableBody' },
+  staff: { id: 9882, route: '/portal/staff?view=invoices', section: 'staffInvoiceSection', host: '#staffInvoiceCompanyFolders', rows: '#staffInvoiceTableBody tr', table: '#staffInvoiceTableBody' },
   client: { id: 9883, route: '/client', host: '#clientInvoiceCompanyFolders', rows: '#clientRecordList .client-record', table: '#clientRecordList' }
 };
 async function openSurface(browser, fixture, type) {
@@ -100,10 +100,27 @@ async function openSurface(browser, fixture, type) {
   const page = await context.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(fixture.origin + surface.route);
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('user') || '{}').id > 0);
-  if (surface.section) await page.evaluate(section => (window.goSection || window.goStaffSection)(section), surface.section);
+  // The supported requested-view URL lets the actual authenticated boot choose
+  // its page. Cached localStorage identity is published before queued initial
+  // navigation; calling goSection at that point races those real boot timers.
+  // Observe the authoritative controller identity and permitted selected page
+  // instead of forcing a hidden section or replacing the boot lifecycle.
+  await page.waitForFunction(({ id, kind, section }) => {
+    const authoritative = kind === 'client'
+      ? (typeof vvClientUser === 'object' ? vvClientUser : null)
+      : (typeof currentUser === 'object' ? currentUser : null);
+    const cached = JSON.parse(localStorage.getItem('user') || '{}');
+    if (Number(authoritative?.id) !== id || Number(cached.id) !== id) return false;
+    if (!section) return true;
+    const panel = document.getElementById(section);
+    const navigation = document.querySelector('.sidebar .nav-btn[data-section="' + section + '"]');
+    return Boolean(panel && navigation && !panel.classList.contains('hidden-section') &&
+      getComputedStyle(panel).display !== 'none' && !navigation.classList.contains('hidden-section') &&
+      navigation.classList.contains('active'));
+  }, { id: surface.id, kind: type, section: surface.section });
   const host = page.locator(surface.host);
-  await host.locator('[data-invoice-folder]').first().waitFor();
+  await host.locator('[data-invoice-folder]').first().waitFor({ state: 'visible' });
+  await page.waitForFunction(() => !document.getElementById('vvGlobalBrandLoader')?.classList.contains('is-visible'));
   return { context, page, host, surface, errors };
 }
 async function waitRows(page, surface, count) {
