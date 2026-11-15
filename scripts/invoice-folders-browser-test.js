@@ -44,6 +44,19 @@ const records = groups.flatMap(group => Array.from({ length: group.count }, (_, 
 })));
 const invoiceRequests = [], invoiceWrites = [];
 let folderFailure = false, hold = null;
+const transportGates = new Map();
+function transportGate(kind, user) {
+  const id = kind + ':' + user;
+  let enter, release;
+  const gate = { entered: new Promise(resolve => { enter = resolve; }), wait: new Promise(resolve => { release = resolve; }), requests: 0,
+    enter() { this.requests++; enter(); }, release() { transportGates.delete(id); release(); } };
+  transportGates.set(id, gate);
+  return gate;
+}
+async function waitForTransport(kind, user) {
+  const gate = transportGates.get(kind + ':' + user);
+  if (gate) { gate.enter(); await gate.wait; }
+}
 function session(id) {
   const token = jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '1h', jwtid: crypto.randomUUID() });
   fixtures.sessions.set(crypto.createHash('sha256').update(token).digest('hex'), { id: 'invoice-folder-fixture-' + id, user_id: id, session_version: 1, assurance_level: 2 });
@@ -69,8 +82,9 @@ function folderData(user, query) {
     total: folders.length, invoice_total: folders.reduce((sum, group) => sum + group.invoice_count, 0), page, limit, pages: Math.ceil(folders.length / limit) };
 }
 async function makeServer() {
-  return fixtures.makeServer(path.join(root, 'public'), fs.readFileSync(path.join(root, 'public/logo.png')), async (app, { auth, pageAuth, brand }) => {
+  return fixtures.makeServer(path.join(root, 'public'), fs.readFileSync(path.join(root, 'public/logo.png')), async (app, { auth, pageAuth, authController, brand }) => {
     app.get('/client', pageAuth(), (_req, res) => res.type('html').send(brand.injectGlobalBrand(fs.readFileSync(path.join(root, 'public/client-portal.html'), 'utf8'))));
+    app.get('/api/auth/me', auth, async (req, res) => { await waitForTransport('auth', req.user.id); return authController.me(req, res); });
     const finance = (req, res, next) => hasPermission(req.user, 'VIEW_FINANCE') ? next() : res.status(403).json({ message: 'Synthetic invoice access restricted.' });
     app.use('/api/invoice', (req, _res, next) => { if (!['GET', 'HEAD'].includes(req.method)) invoiceWrites.push({ path: req.path, method: req.method }); next(); });
     app.get('/api/invoice/folders', auth, finance, async (req, res) => {
@@ -81,10 +95,11 @@ async function makeServer() {
       if (hold && Number(req.user.id) === hold.user) { const captured = hold; hold = null; captured.enter(body); await captured.wait; captured.delivered = true; }
       return res.json(body);
     });
-    app.get('/api/invoice', auth, finance, (req, res) => {
+    app.get('/api/invoice', auth, finance, async (req, res) => {
       invoiceRequests.push({ path: '/', user: req.user.id, query: { ...req.query } });
       if (req.query.folder && !/^[a-f0-9]{64}$/.test(req.query.folder)) return res.status(422).json({ message: 'Select a valid company folder.' });
       const all = selected(req.user, req.query), page = Number(req.query.page || 1), limit = Number(req.query.limit || 50);
+      await waitForTransport('invoice', req.user.id);
       res.json({ invoices: all.slice((page - 1) * limit, page * limit), total: all.length, page, limit, pages: Math.ceil(all.length / limit), summary: { total_value: all.length * 110, paid_value: 0, balance_value: all.length * 110 } });
     });
   });
@@ -94,6 +109,49 @@ const surfaces = {
   staff: { id: 9882, route: '/portal/staff?view=invoices', section: 'staffInvoiceSection', host: '#staffInvoiceCompanyFolders', rows: '#staffInvoiceTableBody tr', table: '#staffInvoiceTableBody' },
   client: { id: 9883, route: '/client', host: '#clientInvoiceCompanyFolders', rows: '#clientRecordList .client-record', table: '#clientRecordList' }
 };
+async function frameCheckpoint(page) {
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+async function stableObservation(page, collect, args, description) {
+  const deadline = Date.now() + 30000;
+  while (Date.now() < deadline) {
+    // Poll only a synchronous browser predicate. An async predicate can be
+    // accepted as a truthy Promise before its resolved false value is known.
+    const handle = await page.waitForFunction(collect, args, { timeout: Math.max(1, deadline - Date.now()) });
+    const before = await handle.jsonValue();
+    await handle.dispose();
+    if (!before) continue;
+    // page.evaluate correctly awaits this paint barrier. Verify a second
+    // atomic read under the same overall 30-second observation budget.
+    await frameCheckpoint(page);
+    const after = await page.evaluate(collect, args);
+    if (after && JSON.stringify(before) === JSON.stringify(after)) return after;
+  }
+  throw new Error('Timed out observing a stable ' + description + '.');
+}
+function collectSurfaceReady({ id, name, email, section }) {
+  const client = !section;
+  const authoritative = client ? (typeof vvClientUser === 'object' ? vvClientUser : null) : (typeof currentUser === 'object' ? currentUser : null);
+  const cached = JSON.parse(localStorage.getItem('user') || '{}');
+  if (Number(authoritative?.id) !== id || Number(cached.id) !== id || authoritative.email !== email) return false;
+  // These labels are initialized as Loading in each new document and are
+  // written only after its controller consumes the fresh /auth/me result.
+  // currentUser/localStorage alone can both contain the previous document.
+  const identity = document.getElementById(client ? 'clientWelcome' : section === 'invoiceSection' ? 'adminInfo' : 'staffInfo')?.textContent || '';
+  if (!identity.includes(name) || !client && !identity.includes(email)) return false;
+  if (section) {
+    const panel = document.getElementById(section), navigation = document.querySelector('.sidebar .nav-btn[data-section="' + section + '"]');
+    if (!panel || !navigation || panel.classList.contains('hidden-section') || !panel.getClientRects().length ||
+      navigation.classList.contains('hidden-section') || !navigation.classList.contains('active')) return false;
+  }
+  if (document.getElementById('vvGlobalBrandLoader')?.classList.contains('is-visible')) return false;
+  return { id: Number(authoritative.id), email: authoritative.email, identity, section: section || 'client' };
+}
+async function waitForSurfaceReady(page, surface) {
+  const account = accounts.find(item => item.id === surface.id);
+  return stableObservation(page, collectSurfaceReady,
+    { id: surface.id, name: account.name, email: account.email, section: surface.section }, 'authenticated invoice page');
+}
 async function openSurface(browser, fixture, type) {
   const surface = surfaces[type], context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   await context.addCookies([{ name: 'vv_session', value: session(surface.id), url: fixture.origin, httpOnly: true, sameSite: 'Lax' }]);
@@ -103,38 +161,47 @@ async function openSurface(browser, fixture, type) {
   // The supported requested-view URL lets the actual authenticated boot choose
   // its page. Cached localStorage identity is published before queued initial
   // navigation; calling goSection at that point races those real boot timers.
-  // Observe the authoritative controller identity and permitted selected page
-  // instead of forcing a hidden section or replacing the boot lifecycle.
-  await page.waitForFunction(({ id, kind, section }) => {
-    const authoritative = kind === 'client'
-      ? (typeof vvClientUser === 'object' ? vvClientUser : null)
-      : (typeof currentUser === 'object' ? currentUser : null);
-    const cached = JSON.parse(localStorage.getItem('user') || '{}');
-    if (Number(authoritative?.id) !== id || Number(cached.id) !== id) return false;
-    if (!section) return true;
-    const panel = document.getElementById(section);
-    const navigation = document.querySelector('.sidebar .nav-btn[data-section="' + section + '"]');
-    return Boolean(panel && navigation && !panel.classList.contains('hidden-section') &&
-      getComputedStyle(panel).display !== 'none' && !navigation.classList.contains('hidden-section') &&
-      navigation.classList.contains('active'));
-  }, { id: surface.id, kind: type, section: surface.section });
+  // Observe the fresh controller identity and permitted selected page instead
+  // of forcing a hidden section or replacing the boot lifecycle.
+  await waitForSurfaceReady(page, surface);
   const host = page.locator(surface.host);
   await host.locator('[data-invoice-folder]').first().waitFor({ state: 'visible' });
-  await page.waitForFunction(() => !document.getElementById('vvGlobalBrandLoader')?.classList.contains('is-visible'));
   return { context, page, host, surface, errors };
 }
-async function waitRows(page, surface, count) {
-  await page.waitForFunction(({ selector, expected }) => document.querySelectorAll(selector).length === expected, { selector: surface.rows, expected: count });
+function collectCommittedRows({ rows, table, host, section, id, expected, folder, reference }) {
+  const element = document.querySelector(table), panel = section ? document.getElementById(section) : element;
+  const folderHost = document.querySelector(host);
+  if (!element || !panel?.getClientRects().length || !element.getClientRects().length || panel.classList.contains('hidden-section') ||
+    folderHost?.getAttribute('aria-busy') === 'true') return false;
+  const selection = id === 9881 ? (typeof registerFilters === 'object' ? registerFilters.invoices?.folder : '') : new URLSearchParams(location.search).get('invoice_folder');
+  if (selection !== folder) return false;
+  const text = element.innerText;
+  const rowTexts = [...document.querySelectorAll(rows)].map(node => node.textContent);
+  if (rowTexts.length !== expected || !text.includes(reference) || /Loading (?:invoices|authorised records)/i.test(text) ||
+    /INV-(?:SEPARATE|LONG|MISSING|OTHER|UNKNOWN|OWN-SECOND)-/.test(text)) return false;
+  const sequence = id === 9881 ? (typeof invoiceLoadSequence === 'number' ? invoiceLoadSequence : null)
+    : id === 9882 ? (typeof staffInvoiceLoadSequence === 'number' ? staffInvoiceLoadSequence : null)
+    : (typeof clientRecordEpoch === 'number' ? clientRecordEpoch : null);
+  if (!Number.isSafeInteger(sequence) || sequence < 1) return false;
+  return { text, rowTexts, sequence, folder: selection, count: rowTexts.length,
+    title: folderHost?.querySelector('[data-invoice-folder-title]')?.textContent || '',
+    gridVisible: Boolean(folderHost?.querySelector('.vv-invoice-folder-grid')?.getClientRects().length) };
+}
+async function committedRows(page, surface, expected = surface.id === 9883 ? 20 : 25, reference = 'INV-ACME-') {
+  const snapshot = await stableObservation(page, collectCommittedRows,
+    { rows: surface.rows, table: surface.table, host: surface.host, section: surface.section, id: surface.id, expected, folder: groups[0].key, reference }, 'committed invoice selection');
+  // Assert one immutable browser snapshot. A later legitimate refresh must not
+  // turn a validated record read into a separate RPC reading its Loading row.
+  assert.equal(snapshot.count, expected);
+  assert.equal(snapshot.folder, groups[0].key);
+  assert.match(snapshot.text, /INV-ACME-/);
+  assert(snapshot.text.includes(reference));
+  assert(!/Loading (?:invoices|authorised records)/i.test(snapshot.text));
+  assert(!/INV-(?:SEPARATE|LONG|MISSING|OTHER|UNKNOWN|OWN-SECOND)-/.test(snapshot.text), 'A company folder contains only its exact authorised invoice selection.');
+  return snapshot;
 }
 async function selectedRows(page, surface) {
-  await page.waitForFunction(({ rows, table, expected }) => {
-    const value = document.querySelector(table)?.textContent || '';
-    return document.querySelectorAll(rows).length === expected && /INV-ACME-/.test(value) &&
-      !/INV-(?:SEPARATE|LONG|MISSING|OTHER|UNKNOWN|OWN-SECOND)-/.test(value);
-  }, { rows: surface.rows, table: surface.table, expected: surface.id === 9883 ? 20 : 25 });
-  const text = await page.locator(surface.table).innerText();
-  assert.match(text, /INV-ACME-/);
-  assert(!/INV-(?:SEPARATE|LONG|MISSING|OTHER|UNKNOWN|OWN-SECOND)-/.test(text), 'A company folder contains only its exact authorised invoice selection.');
+  return committedRows(page, surface);
 }
 async function selectAlpha(state) {
   const { page, host } = state;
@@ -146,9 +213,10 @@ async function selectAlpha(state) {
     page.waitForResponse(response => { const url = new URL(response.url()); return url.pathname === '/api/invoice' && url.searchParams.get('folder') === groups[0].key && response.status() === 200; }),
     host.locator('[data-invoice-folder="' + groups[0].key + '"]').click()
   ]);
-  await selectedRows(page, state.surface);
-  assert.match(await host.locator('[data-invoice-folder-title]').innerText(), /Acme Engineering/i);
-  assert.equal(await host.locator('.vv-invoice-folder-grid:visible').count(), 0, 'Selected folders show a compact breadcrumb, without a duplicate company grid.');
+  const snapshot = await selectedRows(page, state.surface);
+  assert.match(snapshot.title, /Acme Engineering/i);
+  assert.equal(snapshot.gridVisible, false, 'Selected folders show a compact breadcrumb, without a duplicate company grid.');
+  return snapshot;
 }
 async function clearFolder(state) {
   await state.host.locator('[data-invoice-folder-all]').click();
@@ -165,6 +233,61 @@ async function searchInvoices(state, type, search) {
   if (type === 'client') await input.locator('..').locator('button[type=submit]').click();
   await response;
 }
+function colorChannels(value) {
+  const channels = String(value).match(/[\d.]+/g)?.map(Number);
+  assert(channels?.length >= 3 && channels.every(Number.isFinite), 'A real computed RGB colour is required: ' + value);
+  assert(channels.length < 4 || channels[3] === 1, 'The tested icon, surface and boundary must be opaque: ' + value);
+  return channels.slice(0, 3);
+}
+function graphicalContrast(foreground, background) {
+  const luminance = value => colorChannels(value).map(channel => channel / 255)
+    .map(channel => channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4)
+    .reduce((sum, channel, index) => sum + channel * [.2126, .7152, .0722][index], 0);
+  const a = luminance(foreground), b = luminance(background);
+  return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
+}
+async function verifyFolderSearchContrast(state, type, width, theme) {
+  const button = state.host.locator('.vv-invoice-folder-search > button[type="submit"]'), observations = [];
+  await state.page.mouse.move(0, 0);
+  await button.evaluate(node => node.blur());
+  for (const mode of ['normal', 'keyboard-focus']) {
+    if (mode === 'keyboard-focus') { await state.page.keyboard.press('Tab'); await button.focus(); }
+    const observed = await button.evaluate(node => {
+      const style = getComputedStyle(node), glyph = getComputedStyle(node, '::before');
+      let parentSurface = null;
+      for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+        const value = getComputedStyle(parent).backgroundColor, channels = value.match(/[\d.]+/g)?.map(Number);
+        if (channels?.length === 3 || channels?.length === 4 && channels[3] === 1) { parentSurface = value; break; }
+      }
+      return { foreground: style.color, background: style.backgroundColor, border: style.borderTopColor,
+        borderStyle: style.borderTopStyle, borderWidth: parseFloat(style.borderTopWidth),
+        glyph: { color: glyph.backgroundColor, mask: glyph.maskImage, webkitMask: glyph.webkitMaskImage,
+          opacity: Number(glyph.opacity), width: parseFloat(glyph.width), height: parseFloat(glyph.height) },
+        focusVisible: node.matches(':focus-visible'), outline: style.outlineColor,
+        outlineStyle: style.outlineStyle, outlineWidth: parseFloat(style.outlineWidth), parentSurface };
+    });
+    const label = `${type} ${width}px ${theme} ${mode}: `;
+    assert([observed.glyph.mask, observed.glyph.webkitMask].some(value => value && value !== 'none') &&
+      observed.glyph.opacity === 1 && observed.glyph.width >= 16 && observed.glyph.height >= 16,
+    label + 'the search control must render its actual visible graphical icon.');
+    const iconRatio = graphicalContrast(observed.glyph.color, observed.background);
+    const foregroundRatio = graphicalContrast(observed.foreground, observed.background);
+    const borderRatio = graphicalContrast(observed.border, observed.background);
+    assert(iconRatio >= 3 && foregroundRatio >= 3, label + 'search icon contrast must be at least 3:1: ' + JSON.stringify(observed));
+    assert(observed.borderStyle !== 'none' && observed.borderWidth >= 1 && borderRatio >= 3,
+      label + 'search boundary contrast must be at least 3:1: ' + JSON.stringify(observed));
+    let outlineRatio = null;
+    if (mode === 'keyboard-focus') {
+      outlineRatio = graphicalContrast(observed.outline, observed.parentSurface);
+      assert(observed.focusVisible && observed.outlineStyle !== 'none' && observed.outlineWidth >= 2 && outlineRatio >= 3,
+        label + 'keyboard focus must have a visible contrasting outline: ' + JSON.stringify(observed));
+    }
+    observations.push({ mode, icon_ratio: iconRatio, foreground_ratio: foregroundRatio,
+      border_ratio: borderRatio, outline_ratio: outlineRatio, computed: observed });
+  }
+  await button.evaluate(node => node.blur());
+  return observations;
+}
 async function responsive(state, type, proof) {
   const widths = type === 'admin' ? [320, 360, 390, 430, 768, 1024, 1440] : [320, 390, 768, 1440];
   for (const width of widths) for (const theme of ['light', 'dark']) {
@@ -178,7 +301,9 @@ async function responsive(state, type, proof) {
       assert(control.width >= 44 && control.height >= 44,
         `${type} ${width}px ${theme}: ${JSON.stringify(control)} must retain a 44px touch target.`);
     }
-    proof.layouts.push({ portal: type, width, theme, no_page_overflow: true, accessible_controls: controls.length });
+    const searchContrast = await verifyFolderSearchContrast(state, type, width, theme);
+    proof.layouts.push({ portal: type, width, theme, no_page_overflow: true, accessible_controls: controls.length,
+      search_control_contrast: searchContrast });
     if ([390, 1440].includes(width)) {
       await state.host.scrollIntoViewIfNeeded();
       await state.page.waitForFunction(() => !document.getElementById('vvGlobalBrandLoader')?.classList.contains('is-visible'));
@@ -188,6 +313,39 @@ async function responsive(state, type, proof) {
   await state.page.setViewportSize({ width: 844, height: 390 });
   assert(await state.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
   proof.layouts.push({ portal: type, width: 844, height: 390, landscape: true, no_page_overflow: true });
+}
+async function reloadWithDelayedBootstrap(state, type, proof) {
+  const { page, surface } = state;
+  const authentication = transportGate('auth', surface.id), invoices = transportGate('invoice', surface.id);
+  let readyResolved = false, rowsResolved = false;
+  try {
+    await page.reload();
+    await authentication.entered;
+    const staleReadiness = await page.evaluate(({ id, section }) => {
+      const cached = JSON.parse(localStorage.getItem('user') || '{}');
+      const label = document.getElementById(!section ? 'clientWelcome' : section === 'invoiceSection' ? 'adminInfo' : 'staffInfo')?.textContent || '';
+      return { cachedIdentity: Number(cached.id) === id, freshLabelLoading: /Loading/i.test(label) };
+    }, { id: surface.id, section: surface.section });
+    assert.equal(staleReadiness.cachedIdentity, true, 'Reload deliberately retains the valid previous-document account cache.');
+    assert.equal(staleReadiness.freshLabelLoading, true, 'The fresh controller identity remains pending while its real HTTP response is held.');
+    const ready = waitForSurfaceReady(page, surface).then(() => { readyResolved = true; });
+    await frameCheckpoint(page);
+    assert.equal(readyResolved, false, 'Cached identity alone must not satisfy authenticated reload readiness.');
+    authentication.release();
+    await invoices.entered;
+    const committed = selectedRows(page, surface).then(value => { rowsResolved = true; return value; });
+    await frameCheckpoint(page);
+    assert.equal(rowsResolved, false, 'A held invoice HTTP response cannot pass the committed-record snapshot check.');
+    assert.match(await page.locator(surface.table).innerText(), /Loading (?:invoices|authorised records)/i,
+      'The adversarial fixture genuinely exposes the application loading state, rather than replacing its DOM.');
+    invoices.release();
+    await ready;
+    const snapshot = await committed;
+    assert.match(snapshot.title, /Acme Engineering/i);
+    assert(new URL(page.url()).search.includes('folder'), 'Folder state survives reload using the established navigation URL.');
+    proof.checks.push(type + ': delayed authenticated bootstrap rejects the retained cached-user readiness; delayed invoice transport rejects Loading rows; a stable committed snapshot preserves the selected company after real reload.');
+    return snapshot;
+  } finally { authentication.release(); invoices.release(); }
 }
 async function verifyPortal(browser, fixture, type, proof) {
   const state = await openSurface(browser, fixture, type);
@@ -209,16 +367,16 @@ async function verifyPortal(browser, fixture, type, proof) {
       page.waitForResponse(response => { const url = new URL(response.url()); return url.pathname === '/api/invoice' && url.searchParams.get('folder') === groups[0].key && response.status() === 200; }),
       page.goBack({ waitUntil: 'domcontentloaded' })
     ]);
-    await selectedRows(page, surface);
-    assert.match(await state.host.locator('[data-invoice-folder-title]').innerText(), /Acme Engineering/i);
+    const restored = await selectedRows(page, surface);
+    assert.match(restored.title, /Acme Engineering/i);
     await Promise.all([
       page.waitForResponse(response => { const url = new URL(response.url()); return url.pathname === '/api/invoice' && !url.searchParams.has('folder') && response.status() === 200; }),
       page.goForward({ waitUntil: 'domcontentloaded' })
     ]);
     await state.host.locator('[data-invoice-folder-search]').waitFor({ state: 'visible' });
-    await selectAlpha(state);
+    const selected = await selectAlpha(state);
     proof.checks.push(type + ': browser Back restores the exact company and Forward restores All invoices through fresh authorised API reads.');
-    const firstPage = await page.locator(surface.rows).allTextContents();
+    const firstPage = selected.rowTexts;
     if (type === 'staff') {
       assert.match(await page.locator('#staffInvoicePageInfo').innerText(), /61/);
       await page.locator('#staffInvoiceNext').click();
@@ -227,21 +385,17 @@ async function verifyPortal(browser, fixture, type, proof) {
       await page.locator('[data-register-next="invoices"]').click();
     }
     await page.waitForFunction(({ selector, first }) => JSON.stringify([...document.querySelectorAll(selector)].map(node => node.textContent)) !== JSON.stringify(first), { selector: surface.rows, first: firstPage });
-    await selectedRows(page, surface);
-    assert.notDeepEqual(await page.locator(surface.rows).allTextContents(), firstPage, 'Invoice paging advances within the exact folder.');
+    const nextPage = await selectedRows(page, surface);
+    assert.notDeepEqual(nextPage.rowTexts, firstPage, 'Invoice paging advances within the exact folder.');
     proof.checks.push(type + ': company selection counts all 61 records, confines every row, and paginates beyond the first invoice page.');
     await searchInvoices(state, type, 'INV-ACME-0001');
-    await waitRows(page, surface, 1);
-    assert.match(await page.locator(surface.table).innerText(), /INV-ACME-0001/);
-    assert.equal(await page.locator(surface.rows).count(), 1, 'Existing invoice search intersects the selected folder instead of resetting it.');
+    const searched = await committedRows(page, surface, 1, 'INV-ACME-0001');
+    assert.match(searched.text, /INV-ACME-0001/);
+    assert.equal(searched.count, 1, 'Existing invoice search intersects the selected folder instead of resetting it.');
     await searchInvoices(state, type, '');
     await selectedRows(page, surface);
     proof.checks.push(type + ': existing invoice search composes with the selected company; clearing search retains its exact folder and full count.');
-    await page.reload();
-    await page.waitForFunction(() => JSON.parse(localStorage.getItem('user') || '{}').id > 0);
-    await page.locator(surface.host).locator('[data-invoice-folder-title]').waitFor();
-    await selectedRows(page, surface);
-    assert(new URL(page.url()).search.includes('folder'), 'Folder state survives reload using the established navigation URL.');
+    await reloadWithDelayedBootstrap(state, type, proof);
     proof.checks.push(type + ': selected company persists after a real page refresh.');
     state.host = page.locator(surface.host);
     await clearFolder(state);
