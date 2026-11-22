@@ -1,0 +1,45 @@
+name: AI team setup integrity
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - AGENTS.md
+      - .ai-team/**
+      - .codex/agents/**
+      - scripts/ai-team-*.js
+      - scripts/secret-scan.js
+      - scripts/source-file-inventory-test.js
+      - .github/workflows/ai-team-setup.yml
+  push:
+    branches: [main]
+    paths:
+      - AGENTS.md
+      - .ai-team/**
+      - .codex/agents/**
+      - scripts/ai-team-*.js
+      - scripts/secret-scan.js
+      - scripts/source-file-inventory-test.js
+      - .github/workflows/ai-team-setup.yml
+permissions:
+  contents: read
+jobs:
+  setup-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify immutable payload, roster, inherited models and retained instructions
+        run: python3 .ai-team/setup/verify-setup.py
+      - name: Verify strict example pins and full source secret coverage
+        run: |
+          node scripts/ai-team-secret-scan-test.js
+          node scripts/secret-scan.js
+          node scripts/source-file-inventory-test.js
+      - name: Keep provider activation distinct from configuration integrity
+        run: echo 'Native Codex account sign-in, project/hook trust and actual custom-role spawning are verified in the user client, not claimed by this CI job.'

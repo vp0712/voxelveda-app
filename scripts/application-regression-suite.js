@@ -60,6 +60,7 @@ const checks = [
   'railway-startup-gateway-test.js',
   'release-assurance-test.js',
   'secret-scan.js',
+  'ai-team-secret-scan-test.js',
   'source-file-inventory-test.js',
   'injection-sink-audit.js',
   'security-source-test.js',

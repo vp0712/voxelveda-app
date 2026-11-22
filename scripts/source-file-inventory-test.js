@@ -10,7 +10,7 @@ try{
  fs.writeFileSync(path.join(directory,'package.json'),'{}');
  fs.mkdirSync(path.join(directory,'node_modules'));
  fs.writeFileSync(path.join(directory,'node_modules','dependency.js'),'ignored installed dependency');
- for(const name of ['source-file-inventory.js','secret-scan.js','security-source-test.js'])fs.copyFileSync(path.join(__dirname,name),path.join(directory,'scripts',name));
+ for(const name of ['source-file-inventory.js','secret-scan.js','ai-team-reference-examples.js','security-source-test.js'])fs.copyFileSync(path.join(__dirname,name),path.join(directory,'scripts',name));
  const files=listSourceFiles(directory);
  assert.ok(files.includes('app.js'));assert.ok(!files.some(name=>name.startsWith('node_modules/')));
  const scan=name=>spawnSync(process.execPath,[path.join(directory,'scripts',name)],{encoding:'utf8'});
