@@ -1,0 +1,5 @@
+# Optional settings for current Codex App/CLI releases.
+# Merge these keys into the existing [agents] table if you want this limit.
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 4
