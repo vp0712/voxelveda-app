@@ -38,6 +38,10 @@ perform parallel specialist inspection with honest runtime-discovery evidence.
 - The current collaboration host has no typed custom-agent-role selector. Its
   actual worker identities are documented above, with explicit installed role
   loading. Automatic registry discovery and native hook execution remain unverified.
+- The user explicitly deferred native activation on 22 November 2026. The offered
+  secure device-login attempt was cancelled without replacing credentials. Continue
+  using the available host workers with explicit installed-role loading; do not
+  reopen sign-in until the user requests activation.
 - The final actual source scan passed across 1,381 text files; the strict example
   regression and Git-less packaged-source/security-boundary checks passed. Original
   upstream whitespace in the pinned VideoDB reference is retained byte-for-byte;
