@@ -132,7 +132,11 @@ async function makeServer(publicDirectory, photo, configure) {
     <div id="avatarObserverInvalid" data-avatar-user-id="NaN" data-avatar-name="Synthetic malformed fixture"></div>
     <button id="avatarObserverResponsive" type="button">Check responsiveness</button><output id="avatarObserverClicks">0</output><div id="avatarObserverUnrelated"></div></body></html>`));
   app.post('/api/security/csp-report', (_req, res) => res.sendStatus(204));
+  app.get('/api/device-notices/configuration', (_req, res) => res.json({ push_available: false, latest_release: null }));
+  app.get('/api/device-notices/installation', (_req, res) => res.json({ registered: false }));
   app.use('/api', auth);
+  app.post('/api/device-notices/installation/account', (_req, res) => res.json({ eligible: false, registered: false }));
+  app.get('/api/ai-team/status', (_req, res) => res.json({ eligible: false }));
   app.get('/api/auth/me', authController.me);
   app.get('/api/profile', (req, res) => {
     const user = identities.get(Number(req.user.id));
