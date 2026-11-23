@@ -78,16 +78,42 @@
     });
     return subscription?.toJSON() || null;
   }
-  async function save(destination, optedIn) {
-    const eligible = device?.eligible;
-    device = await call('/installation', 'PUT', { platform: platform.name, installed_version: platform.version,
-      destination, release_opt_in: optedIn }, true);
-    device.eligible = eligible;
+  async function syncWebWorker(destination) {
     if (platform.name === 'web' && webAvailable()) {
       const worker = (await navigator.serviceWorker.getRegistration('/'))?.active;
       worker?.postMessage({ type: 'vv-push-settings', settings: destination ? { headers: headers(), endpoint: destination.endpoint,
         vapid: configuration.vapid_public_key } : null });
     }
+  }
+  async function save(destination, optedIn) {
+    const eligible = device?.eligible;
+    device = await call('/installation', 'PUT', { platform: platform.name, installed_version: platform.version,
+      destination, release_opt_in: optedIn }, true);
+    device.eligible = eligible;
+    await syncWebWorker(destination);
+  }
+  async function refreshDestination(destination) {
+    const eligible = device.eligible;
+    try {
+      device = await call('/installation/destination', 'PATCH', { platform: platform.name, installed_version: platform.version,
+        revision: device.destination_revision, destination });
+      await syncWebWorker(destination);
+    } catch (error) {
+      if (error.status !== 409) throw error;
+      device = await call('/installation');
+    }
+    device.eligible = eligible;
+  }
+  async function unsubscribeWhenUnused() {
+    if (device.registered) return;
+    try {
+      if (platform.native) await native()?.unregister?.();
+      else if (webAvailable()) {
+        await syncWebWorker(null);
+        const active = await navigator.serviceWorker.getRegistration('/');
+        await (await active?.pushManager.getSubscription())?.unsubscribe();
+      }
+    } catch { /* The server no longer retains a destination. */ }
   }
   function element(name, text, className) {
     const node = document.createElement(name);
@@ -204,13 +230,9 @@
     if (supported || device?.release_opt_in) {
       panel.append(button(device?.release_opt_in ? 'Turn off release notifications' : 'Enable release notifications', () => change(async () => {
         if (device?.release_opt_in) {
-          const destination = device.team_linked ? await makeDestination({ request: false }) : null;
-          await save(destination, false);
-          if (!destination && platform.native) await native()?.unregister?.().catch(() => {});
-          if (!destination && webAvailable()) {
-            const active = await navigator.serviceWorker.getRegistration('/');
-            await (await active?.pushManager.getSubscription())?.unsubscribe();
-          }
+          const eligible = device.eligible;
+          device = { ...await call('/installation/releases', 'DELETE'), eligible };
+          await unsubscribeWhenUnused();
         } else {
           const destination = await makeDestination({ request: true });
           if (!destination) throw new Error('Notifications are unavailable or blocked. You can still view updates here.');
@@ -241,7 +263,8 @@
         const destination = await makeDestination({ request: true });
         if (!destination) throw new Error('Allow notifications for this device to link it.');
         const current = await call('/installation/account', 'POST', {}, true);
-        await save(destination, Boolean(current.release_opt_in));
+        if (!current.eligible) throw new Error('This account cannot link an AI Team device.');
+        await save(destination);
         device = { ...await call('/installation/team', 'PUT', { keep_after_logout: keep.checked }), eligible: true };
         return 'Personal device linked.';
       }, output)));
@@ -249,11 +272,7 @@
     if (device?.team_linked) panel.append(button('Unlink AI Team alerts', () => change(async () => {
       const eligibility = device.eligible;
       device = { ...await call('/installation/team', 'DELETE'), eligible: eligibility };
-      if (!device.release_opt_in) {
-        await save(null, false);
-        if (platform.native) await native()?.unregister?.().catch(() => {});
-        else if (webAvailable()) await (await (await navigator.serviceWorker.getRegistration('/'))?.pushManager.getSubscription())?.unsubscribe();
-      }
+      await unsubscribeWhenUnused();
       return 'AI Team alerts unlinked.';
     }, output)));
     panel.append(output);
@@ -298,13 +317,11 @@
           }
           if (device.registered && (device.release_opt_in || device.team_linked)) {
             const permission = await permissionState();
-            const eligible = device.eligible;
-            if (permission === 'denied' || permission === 'default' || permission === 'prompt') await save(null, false);
+            if (permission === 'denied' || permission === 'default' || permission === 'prompt') await refreshDestination(null);
             else if (configuration.push_available && permission === 'granted') {
               const destination = await makeDestination({ request: false, refresh: true });
-              if (destination) await save(destination, device.release_opt_in);
+              if (destination) await refreshDestination(destination);
             }
-            device.eligible = eligible;
           }
         }
       }

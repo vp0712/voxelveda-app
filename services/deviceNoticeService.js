@@ -32,21 +32,34 @@ async function saveDevice(key, { platform, destination, releaseOptIn, installedV
     if (prior.platform !== platform) return null;
     const clear = destination ? '' : ',' + clearBinding;
     await db.query(`UPDATE notice_installations SET destination_hash=?,destination=?,installed_version=?${clear},
-      opted_in_at=IF(?=1 AND release_opt_in=0,UTC_TIMESTAMP(3),opted_in_at),release_opt_in=?,last_seen_at=UTC_TIMESTAMP(3)
+      opted_in_at=CASE WHEN ?=1 AND release_opt_in=0 THEN UTC_TIMESTAMP(3) WHEN ?=0 THEN NULL ELSE opted_in_at END,
+      release_opt_in=COALESCE(?,release_opt_in),last_seen_at=UTC_TIMESTAMP(3)
       WHERE id=? AND secret_hash=?`, [fingerprint, destination && JSON.stringify(destination), installedVersion,
-      releaseOptIn, releaseOptIn, key.id, key.hash]);
+      releaseOptIn ?? null, releaseOptIn ?? null, releaseOptIn ?? null, key.id, key.hash]);
   } else {
     await db.query(`INSERT INTO notice_installations (id,secret_hash,platform,destination_hash,destination,
       installed_version,release_opt_in,opted_in_at,last_seen_at) VALUES (?,?,?,?,?,?,?,IF(?=1,UTC_TIMESTAMP(3),NULL),UTC_TIMESTAMP(3))`,
-    [key.id, key.hash, platform, fingerprint, destination && JSON.stringify(destination), installedVersion, releaseOptIn, releaseOptIn]);
+    [key.id, key.hash, platform, fingerprint, destination && JSON.stringify(destination), installedVersion, Boolean(releaseOptIn), Boolean(releaseOptIn)]);
   }
   return findDevice(key);
 }
-async function rotateDestination(key, expectedHash, destination) {
-  const [result] = await db.query(`UPDATE notice_installations SET destination_hash=?,destination=?,last_seen_at=UTC_TIMESTAMP(3)
-    WHERE id=? AND secret_hash=? AND platform='web' AND destination_hash=? AND (release_opt_in=1 OR owner_id IS NOT NULL)`,
-  [destinationFingerprint('web', destination), JSON.stringify(destination), key.id, key.hash, expectedHash]);
+async function rotateDestination(key, expectedHash, { platform, destination, installedVersion }) {
+  const [result] = await db.query(`UPDATE notice_installations SET destination_hash=?,destination=?,
+    installed_version=COALESCE(?,installed_version),last_seen_at=UTC_TIMESTAMP(3)
+    WHERE id=? AND secret_hash=? AND platform=? AND destination_hash=? AND (release_opt_in=1 OR owner_id IS NOT NULL)`,
+  [destinationFingerprint(platform, destination), JSON.stringify(destination), installedVersion, key.id, key.hash, platform, expectedHash]);
   return result.affectedRows > 0;
+}
+async function disableDestination(key, expectedHash, platform) {
+  const [result] = await db.query(`UPDATE notice_installations SET ${clearBinding},destination_hash=NULL,destination=NULL,
+    release_opt_in=0,opted_in_at=NULL WHERE id=? AND secret_hash=? AND platform=? AND destination_hash=?`,
+  [key.id, key.hash, platform, expectedHash]);
+  return result.affectedRows > 0;
+}
+async function optOutOfReleases(key) {
+  await db.query(`UPDATE notice_installations SET release_opt_in=0,opted_in_at=NULL,
+    destination_hash=IF(owner_id IS NULL,NULL,destination_hash),destination=IF(owner_id IS NULL,NULL,destination)
+    WHERE id=? AND secret_hash=?`, [key.id, key.hash]);
 }
 async function reconcileBinding(key, actorId) {
   await db.query(`UPDATE notice_installations SET ${clearBinding}
@@ -81,7 +94,8 @@ async function bindDevice(key, req, keep) {
   return result.affectedRows > 0;
 }
 async function unlinkDevice(key) {
-  await db.query(`UPDATE notice_installations SET ${clearBinding} WHERE id=? AND secret_hash=?`, [key.id, key.hash]);
+  await db.query(`UPDATE notice_installations SET ${clearBinding},destination_hash=IF(release_opt_in=0,NULL,destination_hash),
+    destination=IF(release_opt_in=0,NULL,destination) WHERE id=? AND secret_hash=?`, [key.id, key.hash]);
 }
 async function onLogout(req, { all = false } = {}) {
   if (!req.user?.id || (!all && !req.session?.id)) return;
@@ -200,5 +214,6 @@ function startDeviceNoticeWorker() {
 }
 async function stopDeviceNoticeWorker() { clearInterval(timer); timer = null; await inflight; }
 
-module.exports = { deviceKey, findDevice, saveDevice, rotateDestination, activeAuthorization, reconcileBinding, reattachBinding, bindDevice, unlinkDevice, onSignIn, onLogout,
+module.exports = { deviceKey, findDevice, saveDevice, rotateDestination, disableDestination, optOutOfReleases,
+  activeAuthorization, reconcileBinding, reattachBinding, bindDevice, unlinkDevice, onSignIn, onLogout,
   latestRelease, recordRelease, dispatchDeviceNotices, startDeviceNoticeWorker, stopDeviceNoticeWorker };

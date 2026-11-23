@@ -86,6 +86,35 @@ async function main() {
   await notices.unlinkDevice(personal.credential);
   assert.equal((await notices.findDevice(personal.credential)).owner_id,null);
   assert.equal((await notices.findDevice(personal.credential)).release_opt_in,1);
-  console.log('Real MySQL verified persistent opt-in, release and team retries, concurrent claims, expiry, explicit logout retention, account switch and session revocation. Provider simulated.');
+
+  const previous = await notices.findDevice(personal.credential);
+  await notices.optOutOfReleases(personal.credential);
+  const replacement = device().destination;
+  assert.equal(await notices.rotateDestination(personal.credential, previous.destination_hash,
+    {platform:'web',destination:replacement,installedVersion:null}),false,
+  'A second tab cannot rotate or restore an opted-out destination from an earlier read');
+  let stopped = await notices.findDevice(personal.credential);
+  assert.equal(stopped.release_opt_in,0);
+  assert.equal(stopped.destination_hash,null);
+
+  const linked = device();
+  await notices.saveDevice(linked.credential,{platform:'web',destination:linked.destination,releaseOptIn:true,installedVersion:null});
+  assert(await notices.bindDevice(linked.credential,await session(randomUUID()),false));
+  await notices.optOutOfReleases(linked.credential);
+  const teamOnly = await notices.findDevice(linked.credential);
+  assert.equal(teamOnly.owner_id,ids.personal);
+  assert.equal(teamOnly.release_opt_in,0);
+  assert(teamOnly.destination_hash);
+  await notices.saveDevice(linked.credential,{platform:'web',destination:linked.destination,installedVersion:null});
+  assert.equal((await notices.findDevice(linked.credential)).release_opt_in,0,'Updating only team enrollment preserves the public choice');
+  assert(await notices.rotateDestination(linked.credential,teamOnly.destination_hash,
+    {platform:'web',destination:replacement,installedVersion:null}));
+  assert.equal(await notices.disableDestination(linked.credential,teamOnly.destination_hash,'web'),false,
+    'A stale browser permission response cannot clear a newer destination');
+  await notices.unlinkDevice(linked.credential);
+  stopped = await notices.findDevice(linked.credential);
+  assert.equal(stopped.owner_id,null);
+  assert.equal(stopped.destination_hash,null);
+  console.log('Real MySQL verified persistent opt-in, release and team retries, concurrent claims, expiry, explicit logout retention, account switch, session revocation and unsubscribe/rotation ordering. Provider simulated.');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => pool.end());

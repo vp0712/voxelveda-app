@@ -49,12 +49,17 @@ async function view(browser, fixture, viewport, theme, id, action) {
 async function main() {
   fs.mkdirSync(output, { recursive:true });
   let latest = null;
+  let optedIn = false;
   const read = new Set();
   const fixture = await fixtures.makeServer(publicDirectory, fs.readFileSync(path.join(publicDirectory, 'logo.png')), (app, { auth, brand, identities }) => {
     identities.set(owner.id, owner);
     app.get('/login', (_req, res) => res.type('html').send(brand.injectGlobalBrand(fs.readFileSync(path.join(publicDirectory, 'login.html'), 'utf8'))));
     app.get('/api/device-notices/configuration', (_req, res) => res.json({ push_available:false, latest_release:latest }));
-    app.get('/api/device-notices/installation', (_req, res) => res.json({ registered:false }));
+    app.get('/api/device-notices/installation', (_req, res) => res.json({ registered:optedIn, release_opt_in:optedIn }));
+    app.delete('/api/device-notices/installation/releases', (_req, res) => {
+      optedIn = false;
+      res.json({ registered:false, release_opt_in:false });
+    });
     app.post('/api/device-notices/installation/account', auth, (_req, res) => res.json({ eligible:false, registered:false }));
     app.use('/api/ai-team', auth);
     const unread = () => events.filter(event => !event.is_read && !read.has(event.id)).length;
@@ -75,6 +80,17 @@ async function main() {
       await page.goto(fixture.origin + '/login');
       await page.locator('[data-device-notices-entry]').getByText('Latest verified web release').waitFor();
       await page.screenshot({ path:path.join(output,'sign-in-release-phone.png'), animations:'disabled' });
+    });
+    optedIn = true;
+    await view(browser, fixture, {width:390,height:844}, 'light', null, async page => {
+      await page.addInitScript(() => {
+        localStorage.setItem('vv.noticeInstallation.v1', JSON.stringify({id:crypto.randomUUID(),key:'a'.repeat(43)}));
+        Object.defineProperty(window, 'Notification', {value:{permission:'granted'}});
+      });
+      await page.goto(fixture.origin + '/login');
+      await page.getByRole('button', {name:'Turn off release notifications'}).click();
+      await page.getByText('Saved.', {exact:true}).waitFor();
+      assert.equal(optedIn,false,'A signed-out installation can unsubscribe when the push provider is unavailable');
     });
     latest = null;
     await view(browser, fixture, {width:390,height:844}, 'light', 9401, async page => {

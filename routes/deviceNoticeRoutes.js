@@ -13,7 +13,8 @@ const endpoint = handler => (req,res,next) => Promise.resolve(handler(req,res)).
   next(error);
 });
 const state = device => ({ release_opt_in: Boolean(device?.release_opt_in), registered: Boolean(device?.destination_hash),
-  team_linked: Boolean(device?.owner_id), keep_team_after_logout: Boolean(device?.retain_after_logout) });
+  destination_revision: device?.destination_hash || null, team_linked: Boolean(device?.owner_id),
+  keep_team_after_logout: Boolean(device?.retain_after_logout) });
 const validVersion = value => typeof value === 'string' && /^\d{1,10}(\.\d{1,5}){0,3}$/.test(value);
 const pushAvailable = platform => process.env.DEVICE_PUSH_WORKER_ENABLED === 'true' && configured(platform);
 
@@ -36,24 +37,33 @@ router.get('/installation', endpoint(async (req,res) => res.json(state(await ser
 router.put('/installation', endpoint(async (req,res) => {
   const { platform, destination, release_opt_in: optIn, installed_version: version } = req.body || {};
   const normalized = destination === null ? null : normalizeDestination(platform, destination);
-  if (!platforms.includes(platform) || typeof optIn !== 'boolean' || (destination !== null && !normalized) ||
-    (optIn && !normalized) || (platform !== 'web' && !validVersion(version))) {
+  if (!platforms.includes(platform) || !normalized || (optIn !== undefined && optIn !== true) ||
+    (platform !== 'web' && !validVersion(version))) {
     return res.status(422).json({message:'Device push registration is invalid.'});
   }
   if (normalized && !pushAvailable(platform)) return res.status(503).json({message:'Push delivery is not configured for this platform.'});
   const device = await service.saveDevice(req.deviceKey, { platform, destination: normalized, releaseOptIn: optIn,
     installedVersion: platform === 'web' ? null : version });
   if (!device) return res.status(409).json({message:'This installation uses another platform.'});
-  return res.json(state(normalized ? device : null));
+  return res.json(state(device));
 }));
 router.patch('/installation/destination', endpoint(async (req,res) => {
-  const destination = normalizeDestination('web', req.body?.destination);
-  const oldEndpoint = req.body?.previous_endpoint;
-  if (!destination || typeof oldEndpoint !== 'string' || oldEndpoint.length > 1800) {
-    return res.status(422).json({message:'Push rotation requires both destinations.'});
+  const { platform = 'web', destination, previous_endpoint: oldEndpoint, revision, installed_version: version } = req.body || {};
+  const expected = platform === 'web' && typeof oldEndpoint === 'string' && oldEndpoint.length <= 1800 ? sha('web:' + oldEndpoint) : revision;
+  const normalized = destination === null ? null : normalizeDestination(platform, destination);
+  if (!platforms.includes(platform) || !/^[a-f0-9]{64}$/.test(expected || '') ||
+    (destination !== null && !normalized) || (platform !== 'web' && !validVersion(version))) {
+    return res.status(422).json({message:'Push rotation requires a valid registration and its current revision.'});
   }
-  const rotated = await service.rotateDestination(req.deviceKey, sha('web:' + oldEndpoint), destination);
-  return res.status(rotated ? 200 : 409).json({rotated});
+  if (normalized && !pushAvailable(platform)) return res.status(503).json({message:'Push delivery is not configured for this platform.'});
+  const updated = normalized ? await service.rotateDestination(req.deviceKey, expected,
+    { platform, destination:normalized, installedVersion:platform === 'web' ? null : version }) :
+    await service.disableDestination(req.deviceKey, expected, platform);
+  return res.status(updated ? 200 : 409).json(state(await service.findDevice(req.deviceKey)));
+}));
+router.delete('/installation/releases', endpoint(async (req,res) => {
+  await service.optOutOfReleases(req.deviceKey);
+  return res.json(state(await service.findDevice(req.deviceKey)));
 }));
 router.delete('/installation/team', endpoint(async (req,res) => {
   await service.unlinkDevice(req.deviceKey);
