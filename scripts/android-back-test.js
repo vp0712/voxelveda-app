@@ -19,6 +19,13 @@ async function run(){
  f=fixture();assert.equal(f.app.handleBack({canGoBack:true,requestId:'first'}),true);assert.equal(f.app.takeBackDecision('first'),'pending');assert.equal(f.app.takeBackDecision('unrelated'),null);await flush();assert.equal(f.confirmations,1);
  assert.equal(f.app.handleBack({canGoBack:true,requestId:'repeated'}),true,'Repeated Back dismisses only the current confirmation');await flush();assert.equal(f.closed,1);assert.equal(f.app.takeBackDecision('first'),'cancelled');assert.equal(f.field.value,'Unsaved synthetic value');assert.equal(f.backs,0);
  assert.equal(f.app.handleBack({canGoBack:false,requestId:'cancelled'}),true);await flush();f.answer(false);await flush();assert.equal(f.app.takeBackDecision('cancelled'),'cancelled');assert.equal(f.backs,0);
+ const rapid=fixture();
+ assert.equal(rapid.app.handleBack({canGoBack:false,requestId:'old-press'}),true);await flush();rapid.answer(false);await flush();
+ assert.equal(rapid.app.handleBack({canGoBack:false,requestId:'next-press'}),true);await flush();
+ assert.equal(rapid.confirmations,2,'New Back opens a confirmation before Android polls the cancelled request');
+ assert.equal(rapid.app.takeBackDecision('old-press'),null,'The old native request cannot consume a new decision');
+ assert.equal(rapid.app.takeBackDecision('next-press'),'pending');rapid.answer(true);await flush();
+ assert.equal(rapid.app.takeBackDecision('next-press'),'continue');assert.equal(rapid.backs,0);
  assert.equal(f.app.handleBack({canGoBack:false,requestId:'confirmed'}),true);await flush();f.answer(true);await flush();assert.equal(f.app.takeBackDecision('confirmed'),'continue','A confirmed cold-screen Back can finish through the native continuation');assert.equal(f.app.takeBackDecision('confirmed'),null,'The same confirmation cannot navigate twice');assert.equal(f.app.allowDiscardOnUnload(f.form),true);assert.equal(f.app.allowDiscardOnUnload(f.form),false,'The browser unload grant is one-shot');
  for(const change of ['new-input','changed-account','detached-form']){
   f=fixture();assert.equal(f.app.handleBack({canGoBack:true,requestId:change}),true);await flush();f.answer(true);await flush();

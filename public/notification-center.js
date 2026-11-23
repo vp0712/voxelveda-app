@@ -35,7 +35,10 @@
   function sameAccount(epoch){return checkAccount()===epoch;}
   function accountChanged(){return Object.assign(new Error('Your account changed. Reopen notifications for your current account.'),{code:'NOTIFICATION_ACCOUNT_CHANGED'});}
   async function requestJson(url,options={}) {
-    const epoch=checkAccount(),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);requests.add(controller);
+    const epoch=checkAccount(),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
+    // An early cookie-authenticated badge poll can outlive identity discovery.
+    // The epoch still rejects it, without WebKit treating it as a fetch error.
+    if (!['/api/notifications/unread-count','/api/ai-team/status'].includes(url)) requests.add(controller);
     try {
       const response=await fetch(url,{credentials:'same-origin',...options,headers:{...headers(),...(options.headers || {})},signal:controller.signal});
       if(!sameAccount(epoch))throw accountChanged();

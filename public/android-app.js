@@ -19,6 +19,8 @@
   discardConsent=decision;return 'continue';
  }
  function confirmDiscard(form,options){
+  // A new Back may arrive before Android polls the cancelled request.
+  if(backDecision?.state==='cancelled')backDecision=null;
   if(backDecision)return;
   if(typeof window.VoxelFeedback?.confirm!=='function')return; // Keep unsaved values when the shared UI is unavailable.
   const decision={form,values:formValues(form),owner:owner(),requestId:typeof options.requestId==='string'?options.requestId:null,state:'pending'};
