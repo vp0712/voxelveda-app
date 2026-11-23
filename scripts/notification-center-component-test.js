@@ -52,7 +52,7 @@ async function accountSwitch() {
   const f=fixture();f.start();const countA=f.next('/api/notifications/unread-count'),openA=f.window.VoxelNotificationCenter.open(f.bell);f.next('/api/notifications?page=1&limit=30').resolve(listing(101,'Account A',2));await openA;assert.equal(f.badge.textContent,'2');assert.match(f.panel.textContent,/Account A/);
   f.window.dispatchEvent(new CustomEvent('vv:avatar-profile',{detail:{profile:{id:1}}}));await flush();assert.equal(f.panel.hidden,false,'An initial verified same-account profile does not clear the center.');assert.equal(f.badge.textContent,'2');
   f.clickRow(101);const readA=f.next('/api/notifications/101/open'),before=f.requests.length;await f.window.VoxelNotificationCenter.refresh();assert.equal(f.requests.length,before,'Polling does not race a persisted read.');
-  f.switchTo('B',2);assert.equal(f.panel.hidden,true);assert.equal(f.badge.hidden,true);assert.doesNotMatch(f.panel.textContent,/Account A/);assert.ok(readA.options.signal.aborted);assert.equal(countA.options.signal.aborted,false,'A superseded badge poll is fenced by account epoch without a browser cancellation');const countB=f.next('/api/notifications/unread-count');
+  f.switchTo('B',2);assert.equal(f.panel.hidden,true);assert.equal(f.badge.hidden,true);assert.doesNotMatch(f.panel.textContent,/Account A/);assert.ok(readA.options.signal.aborted);assert.ok(countA.options.signal.aborted);const countB=f.next('/api/notifications/unread-count');
   const openB=f.window.VoxelNotificationCenter.open(f.bell),listB=f.next('/api/notifications?page=1&limit=30');readA.resolve({unread:99,target_status:'AVAILABLE',target:{kind:'TASK',record_id:'11',record:{title:'Stale A task'}},action_url:'/portal/staff?view=tasks'});countA.resolve({unread:99});await flush();assert.equal(f.panel.querySelector('[data-notification-list]').attrs['aria-busy'],'true');assert.doesNotMatch(f.panel.textContent,/Stale A/);assert.equal(f.navigation.length,0);listB.resolve(listing(201,'Account B'));await openB;countB.resolve({unread:55});await flush();assert.equal(f.badge.textContent,'1');
   const refreshB=f.window.VoxelNotificationCenter.refresh(),lateB=f.next('/api/notifications?page=1&limit=30');f.switchTo('C',3,'vv:auth-changed');const openC=f.window.VoxelNotificationCenter.open(f.bell),listC=f.next('/api/notifications?page=1&limit=30');lateB.resolve(listing(202,'Late B',77));await refreshB;await flush();assert.equal(f.panel.querySelector('[data-notification-list]').attrs['aria-busy'],'true','Old finally cannot unlock a new-account load.');const requestCount=f.requests.length;void f.window.VoxelNotificationCenter.refresh();assert.equal(f.requests.length,requestCount,'The new-account request retains ownership.');listC.resolve(listing(301,'Account C'));await openC;assert.doesNotMatch(f.panel.textContent,/Late B/);
   f.clickRow(301);f.next('/api/notifications/301/open').resolve({unread:0,target_status:'AVAILABLE',target:{kind:'TASK',record_id:'33',record:{title:'C task'}}});await flush();const targetC=f.next('/api/notifications/301/target');f.switchTo('D',4,'vv:avatar-clear');targetC.resolve({target_status:'AVAILABLE',target:{kind:'TASK',record_id:'33',record:{title:'Stale C task'}}});await flush();assert.equal(f.document.querySelector('.vv-notification-record-cover'),null);
@@ -65,6 +65,17 @@ async function profilePreferences() {
   f.document.querySelector('[data-preference-status]').querySelector('button').dispatchEvent(new Event('click'));f.next('/api/notifications/preferences').resolve({preferences:[{category:'HR',in_app_enabled:1,email_enabled:1,quiet_start:'20:00'}]});await flush();assert.match(form.textContent,/Invoices and expenses/);assert.equal(form.querySelectorAll('input').find(input=>input.name==='HR').checked,true);const saving=form.onsubmit({preventDefault(){}});const patches=f.requests.filter(row=>!row.done&&row.options.method==='PATCH');assert.equal(patches.length,7);assert.ok(patches.every(row=>row.options.headers.Authorization==='Bearer account-B'));
   f.switchTo('C',3,'vv:auth-changed');patches.forEach(row=>row.resolve({success:true}));await saving;assert.equal(form.children.length,0);assert.doesNotMatch(f.document.querySelector('[data-preference-status]').textContent,/Preferences saved/);assert.ok(patches.every(row=>row.options.signal.aborted));
   f.document.querySelector('[data-preference-status]').querySelector('button').dispatchEvent(new Event('click'));f.next('/api/notifications/preferences').resolve({preferences:[{category:'HR',in_app_enabled:0}]});await flush();assert.equal(form.querySelectorAll('input').find(input=>input.name==='HR').checked,false,'Reload uses current-account preferences.');
+}
+async function navigationClearsNotifications() {
+  const f=fixture();f.start();
+  f.next('/api/notifications/unread-count').resolve({unread:3});
+  f.next('/api/ai-team/status').resolve({eligible:false});await flush();
+  assert.equal(f.badge.textContent,'3');
+  const before=f.requests.length;
+  f.window.dispatchEvent(new CustomEvent('vv:avatar-clear',{detail:{reason:'pagehide'}}));
+  f.window.dispatchEvent(new Event('pagehide'));await flush();
+  assert.equal(f.badge.hidden,true,'A departing page clears private counts');
+  assert.equal(f.requests.length,before,'Navigation does not start new badge or AI Team requests');
 }
 async function aiTeamFeed() {
   const f=fixture({bellId:'notificationBell',search:'?view=home&team_activity=1'});f.start();
@@ -101,4 +112,4 @@ async function aiTeamFeed() {
   staff.document.querySelector('[data-ai-team-close]').dispatchEvent(new Event('click'));
   assert.equal(staff.window.VoxelOverlay.active,null);assert.equal(staff.document.activeElement,staffTeam);
 }
-(async()=>{await accountSwitch();await profilePreferences();await aiTeamFeed();console.log('PASS notification isolation, read/poll serialization, preferences and both AI Team bell anchors, deep links, unread counts, permitted detail and empty state.');})().catch(error=>{console.error(error.stack);process.exitCode=1;});
+(async()=>{await accountSwitch();await profilePreferences();await navigationClearsNotifications();await aiTeamFeed();console.log('PASS notification isolation, navigation cleanup, read/poll serialization, preferences and both AI Team bell anchors, deep links, unread counts, permitted detail and empty state.');})().catch(error=>{console.error(error.stack);process.exitCode=1;});

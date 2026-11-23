@@ -35,10 +35,7 @@
   function sameAccount(epoch){return checkAccount()===epoch;}
   function accountChanged(){return Object.assign(new Error('Your account changed. Reopen notifications for your current account.'),{code:'NOTIFICATION_ACCOUNT_CHANGED'});}
   async function requestJson(url,options={}) {
-    const epoch=checkAccount(),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
-    // An early cookie-authenticated badge poll can outlive identity discovery.
-    // The epoch still rejects it, without WebKit treating it as a fetch error.
-    if (!['/api/notifications/unread-count','/api/ai-team/status'].includes(url)) requests.add(controller);
+    const epoch=checkAccount(),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);requests.add(controller);
     try {
       const response=await fetch(url,{credentials:'same-origin',...options,headers:{...headers(),...(options.headers || {})},signal:controller.signal});
       if(!sameAccount(epoch))throw accountChanged();
@@ -450,7 +447,11 @@
   }
   window.VoxelNotificationCenter={open,toggle,close,refresh,refreshCount,get ready(){return Boolean(panel);}};
   window.VoxelAITeam={openFromNotice};
-  window.addEventListener('vv:avatar-clear',()=>{profileUserId='';resetAccount();refreshAccountNotices();});
+  window.addEventListener('vv:avatar-clear',event=>{
+    profileUserId='';resetAccount();
+    // Navigation clears private display state but must not fetch from the departing page.
+    if(event.detail?.reason!=='pagehide')refreshAccountNotices();
+  });
   window.addEventListener('vv:auth-changed',()=>{profileUserId='';resetAccount();refreshAccountNotices();});
   window.addEventListener('storage',event=>{if(!event.key || ['token','user'].includes(event.key)){checkAccount();if(panel){void refreshCount();void refreshTeamStatus();}}});
   window.addEventListener('vv:avatar-profile',event=>{const id=String(event.detail?.profile?.id || '');if(id && id!==profileUserId){const previousEpoch=accountEpoch;profileUserId=id;checkAccount();if(panel && (previousEpoch!==accountEpoch || state.unread===null)){void refreshCount();void refreshTeamStatus();}}});
