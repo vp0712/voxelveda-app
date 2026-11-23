@@ -2,10 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Voxel Veda</title>
-<link rel="stylesheet" href="/style.css?v=20260730-expense-access" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Sign in | Voxel Veda</title>
+  <link rel="stylesheet" href="/style.css?v=20260730-expense-access" />
   <link rel="stylesheet" href="/auth-entry.css?v=20261009-navy-blue" />
+  <link rel="stylesheet" href="/app-entry-design.css" />
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20260703-brand" />
@@ -19,66 +20,42 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:image" content="https://app.voxelveda.com/og-image.png?v=20260703-brand" /></head>
 
-<body class="login-page">
-  <section class="vv-entry-sequence" aria-hidden="true">
-    <div class="vv-entry-core">
-      <span class="vv-entry-ring vv-entry-ring-one"></span>
-      <span class="vv-entry-ring vv-entry-ring-two"></span>
-      <img src="/Frame 1.png?v=20260703-brand" alt="" />
-      <div class="vv-entry-scan"></div>
-    </div>
-    <div class="vv-entry-status">
-      <span></span>
-      <strong>Voxel Veda</strong>
-    </div>
-  </section>
-
+<body class="login-page vv-sign-in" data-vv-entry-surface="sign-in">
   <main class="login-shell">
-    <section class="login-card">
-      <div class="login-logo-box">
-        <img src="/Frame 1.png?v=20260703-brand" alt="Voxel Veda Logo" class="login-logo" />
+    <section class="login-card" aria-labelledby="loginTitle">
+      <div class="vv-entry-art">
+        <img class="vv-entry-illustration" src="/images/vv-scan-illustration.webp" alt="" fetchpriority="high" />
+        <img class="vv-entry-logo" src="/logo.png" alt="Voxel Veda" width="68" height="68" />
       </div>
+      <div class="vv-entry-form">
+        <h1 id="loginTitle">Sign in</h1>
+        <p class="vv-entry-intro">Use your Voxel Veda account to open your workspace.</p>
 
-      <h1>Voxel Veda</h1>
+        <div id="loginStatus" class="status" role="status" aria-live="polite"></div>
 
-      <div id="loginStatus" class="status" role="status" aria-live="polite"></div>
+        <form method="post" action="/api/auth/login" id="loginForm" novalidate>
+          <div class="login-field">
+            <label for="email">Work email or user ID</label>
+            <input type="text" id="email" placeholder="Enter work email or user ID"
+              autocomplete="username" autocapitalize="none" spellcheck="false" required />
+          </div>
 
-      <form method="post" action="/api/auth/login" id="loginForm" novalidate>
-        <div class="login-field">
-          <label for="email">Work Email / User ID</label>
-          <input
-            type="text"
-            id="email"
-            placeholder="Enter work email or user ID"
-            autocomplete="username"
-            autocapitalize="none"
-            spellcheck="false"
-            required
-          />
-        </div>
+          <div class="login-field">
+            <label for="password">Password</label>
+            <input type="password" id="password" placeholder="Enter your password"
+              autocomplete="current-password" required />
+          </div>
 
-        <div class="login-field">
-          <label for="password">Password</label>
-          <input
-            type="password"
-            id="password"
-            placeholder="Enter your password"
-            autocomplete="current-password"
-            required
-          />
-        </div>
+          <div class="vv-entry-recovery"><a href="/forgot-password">Forgot password?</a></div>
+          <button type="submit" id="loginButton" disabled class="login-btn">Sign In</button>
+        </form>
 
-        <button type="submit" id="loginButton" disabled class="login-btn">Sign In</button>
-      </form>
-
-      <p class="login-register-prompt">New to Voxel Veda? <a href="/register">Register / Create account</a></p>
-
-      <div class="portal-links"><a href="/forgot-password">Forgot password</a></div>
-
-      <p class="login-footnote">Your projects and account, in one clear workspace.</p>
-      <footer class="login-footer-links" aria-label="Privacy and support links">
-        <a href="/privacy">Privacy Policy</a><span aria-hidden="true">·</span><a href="/terms">Terms</a><span aria-hidden="true">·</span><a href="/support">Support</a>
-      </footer>
+        <p class="login-register-prompt">New to Voxel Veda? <a href="/register">Create an account</a></p>
+        <div data-device-notices-entry></div>
+        <footer class="login-footer-links" aria-label="Privacy and support links">
+          <a href="/privacy">Privacy Policy</a><span aria-hidden="true">·</span><a href="/terms">Terms</a><span aria-hidden="true">·</span><a href="/support">Support</a>
+        </footer>
+      </div>
     </section>
   </main>
 

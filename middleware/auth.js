@@ -1,12 +1,12 @@
-const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
-const { getRequestToken, clearSessionCookie } = require('../utils/session');
+const { RESUME_TYPE, getRequestToken, getSessionCredential, hasSessionCookie, setAccessCookie, clearSessionCookie } = require('../utils/session');
 const { ensureUserLifecycleSchema } = require('../services/userLifecycleService');
 const { ensureSecuritySchema } = require('../services/securitySchema');
 const { logSecurityEvent, validateSession } = require('../services/sessionService');
 const { requiresMfa } = require('../services/mfaService');
 const { authenticateApiToken, isApiToken } = require('../services/apiTokenService');
 const { loadBreakGlassPermissions, parseJsonArray, resolveImpersonation } = require('../services/securityContextService');
+const { isStepUpFresh } = require('../services/stepUpService');
 
 function parsePermissions(value) {
   if (!value) return [];
@@ -24,7 +24,7 @@ module.exports = async (req, res, next) => {
   try {
     const token = getRequestToken(req);
 
-    if (!token) {
+    if (!token && !hasSessionCookie(req)) {
       clearSessionCookie(req, res);
       return res.status(401).json({
         message: 'Authentication required',
@@ -48,11 +48,16 @@ module.exports = async (req, res, next) => {
       return next();
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const credential = getSessionCredential(req, process.env.JWT_SECRET);
+    if (!credential) {
+      clearSessionCookie(req, res);
+      return res.status(401).json({ message: 'Your session has ended. Please sign in again.', code: 'AUTH_SESSION_EXPIRED' });
+    }
 
     await ensureUserLifecycleSchema();
     await ensureSecuritySchema();
-    const session = await validateSession(token, decoded);
+    const { decoded } = credential;
+    const session = await validateSession(credential.token, decoded);
     if (!session) {
       clearSessionCookie(req, res);
       return res.status(401).json({ message: 'Your session has ended. Please sign in again.', code: 'AUTH_SESSION_EXPIRED' });
@@ -96,6 +101,7 @@ module.exports = async (req, res, next) => {
       stepUpVerifiedAt: session.step_up_verified_at || null,
       stepUpMethod: session.step_up_method || null
     };
+    if (!isStepUpFresh(req.session)) req.session.assuranceLevel = Math.min(req.session.assuranceLevel, 2);
 
     const mfaRequired = requiresMfa(req.user.role) || Number(freshUser.mfa_enabled) === 1;
     if (mfaRequired && req.session.assuranceLevel < 2) {
@@ -157,17 +163,11 @@ module.exports = async (req, res, next) => {
       }
     }
 
+    if (credential.type === RESUME_TYPE) setAccessCookie(req, res, credential, process.env.JWT_SECRET);
     next();
   } catch (err) {
     if (err?.statusCode === 403) {
       return res.status(403).json({ message: err.message, code: err.code || 'SECURITY_CONTEXT_REJECTED' });
-    }
-    if (['TokenExpiredError', 'JsonWebTokenError', 'NotBeforeError'].includes(String(err?.name || ''))) {
-      clearSessionCookie(req, res);
-      return res.status(401).json({
-        message: 'Your session has ended. Please sign in again.',
-        code: 'AUTH_SESSION_EXPIRED'
-      });
     }
     console.error('AUTH MIDDLEWARE ERROR:', err?.code || err?.message || err);
     return res.status(503).json({

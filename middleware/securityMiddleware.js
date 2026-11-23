@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const path = require('path');
+const { hasSessionCookie } = require('../utils/session');
 const { getRateLimitService, positiveInteger } = require('../services/rateLimitService');
 const { CONTROL_STATES, setControl, setCriticalService } = require('../services/runtimeState');
 
@@ -164,10 +165,10 @@ function safeApiResponses(req, res, next) {
 function csrfProtection(req, res, next) {
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
   if (req.path === '/api/security/csp-report') return next();
-  const hasSessionCookie = String(req.headers.cookie || '').includes('vv_session=');
   const authorization = String(req.headers.authorization || '');
-  const hasBearer = authorization.startsWith('Bearer ') && authorization.slice(7).trim().length > 0;
-  if (!hasSessionCookie || hasBearer) return next();
+  const bearer = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+  const hasBearer = bearer && bearer !== 'null' && bearer !== 'undefined';
+  if (!hasSessionCookie(req) || (hasBearer && req.path !== '/api/auth/logout')) return next();
   const fetchSite = String(req.headers['sec-fetch-site'] || '').toLowerCase();
   if (fetchSite === 'cross-site') return res.status(403).json({ message: 'Cross-site request rejected' });
   const origin = String(req.headers.origin || '');

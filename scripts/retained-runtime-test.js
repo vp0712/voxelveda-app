@@ -101,6 +101,7 @@ async function testStartup() {
     dependencies['./services/profilePhotoService']={ensureProfilePhotoSchema:async()=>calls.push('profilePhotoSchema')};
     dependencies['./services/workflowEscalationService']={startWorkflowSlaScheduler:()=>{calls.push('workflow.start');return false},stopWorkflowSlaScheduler:()=>calls.push('workflow.stop')};
     dependencies['./services/procurementImportService']={startProcurementImportWorker:()=>{calls.push('import.start');return true},stopProcurementImportWorker:()=>calls.push('import.stop')};
+    dependencies['./services/deviceNoticeService']={startDeviceNoticeWorker:()=>false,stopDeviceNoticeWorker:async()=>{}};
     dependencies['./services/releasePdfVerificationService']={queueAuthorisedReleasePdf:async()=>({enabled:false})};
     dependencies['./services/releaseResendVerificationService']={queueAuthorisedResendVerification:async()=>({enabled:false})};
     const server = load(path.join(root, 'server.js'), dependencies, { NODE_ENV: 'production' });

@@ -7,6 +7,7 @@
   <title>My Profile | Voxel Veda</title>
   <link rel="icon" href="/favicon-32.png">
   <link rel="stylesheet" href="/workspace-theme.css?v=20261013-shared-avatar">
+  <link rel="stylesheet" href="/app-entry-design.css">
   <script src="/workspace-theme.js?v=20261013-shared-avatar" defer></script>
   <script src="/workspace-overlays.js?v=20261013-shared-avatar" defer></script>
   <style>
@@ -23,8 +24,8 @@
     @media(max-width:390px){.photoActions{grid-template-columns:1fr;}.photoActions .danger{grid-column:auto;}.back{padding:9px 11px;font-size:14px;}}
   </style>
 </head>
-<body>
-  <main class="shell">
+<body data-vv-entry-surface="profile">
+  <main class="shell vv-profile-surface">
     <header class="topbar">
       <div class="brand"><img src="/voxel-veda-logo.png" alt="Voxel Veda"><div><strong>Voxel Veda</strong><span>Your account profile</span></div></div>
       <a class="back" id="backLink" href="/dashboard">← Workspace</a>
@@ -72,6 +73,7 @@
         <div class="securityNote">Profile photos are private to your signed-in account and authorised staff-directory access. Login identity, permissions and role cannot be changed from this screen.</div>
       </article>
     </section>
+    <div id="device-notice-settings" data-device-notices-settings></div>
   </main>
 
   <div class="photoViewer" id="photoViewer" hidden aria-hidden="true">

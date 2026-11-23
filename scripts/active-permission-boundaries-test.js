@@ -370,6 +370,7 @@ async function run() {
     '../services/sessionService': { logSecurityEvent: noop },
     '../services/passwordPolicy': { validatePassword },
     '../services/authSessionService': { createAuthenticatedSession: async () => { sessionAttempts += 1; throw new Error('MFA bypass'); } },
+    '../services/deviceNoticeService': {},
     '../services/mfaService': { requiresMfa: mfa.requiresMfa, issueLoginChallenge: async () => 'local-mfa-fixture' }
   });
   res = await call(auth.me, request({}, { user: { id: 2 } }));
@@ -389,9 +390,14 @@ async function run() {
   const sessionRecords = [];
   const localJwtSecret = 'isolated-active-permission-fixture-only-no-production-token';
   const sessions = isolated('services/authSessionService.js', {
-    crypto, jsonwebtoken: jwt,
+    'node:crypto': crypto, jsonwebtoken: jwt,
     './sessionService': { createSession: async (details) => sessionRecords.push(details) },
-    '../utils/session': { setSessionCookie: (_req, _res, token) => sessionTokens.push(token) },
+    '../utils/session': {
+      ...require('../utils/session'),
+      setResumeCookie: (_req, _res, token) => sessionTokens.push(token),
+      setAccessCookie: noop
+    },
+    './deviceNoticeService': { onSignIn: noop },
     './authorizationService': authorization
   }, { JWT_SECRET: localJwtSecret });
   for (const role of ['finance_admin', 'accountant', 'hr', 'admin', 'staff']) {
@@ -400,10 +406,9 @@ async function run() {
     });
     assert.deepEqual(plain(result.user.permissions), ['MANAGE_USERS', 'VIEW_AUDIT_LOG']);
     const decoded = jwt.verify(sessionTokens.at(-1), localJwtSecret);
-    assert.deepEqual(decoded.permissions, ['MANAGE_USERS', 'VIEW_AUDIT_LOG']);
-    assert.equal(decoded.role, role);
-    assert.equal(decoded.assurance_level, 2);
-    assert.equal(decoded.exp - decoded.iat, role === 'staff' ? 28800 : 7200, 'legacy privileged session lifetime remains unchanged');
+    assert.equal(decoded.id, f.record.id);
+    assert.equal(decoded.permissions, undefined, 'persistent credentials do not copy user permissions');
+    assert.equal(decoded.exp - decoded.iat, role === 'staff' ? 345600 : 7200, 'ordinary and privileged session lifetimes remain distinct');
     assert.equal(sessionRecords.at(-1).userId, 2);
     assert.equal(sessionRecords.at(-1).assuranceLevel, 2);
   }

@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Veda Client Portal</title>
+  <link rel="stylesheet" href="/app-entry-design.css">
   <link rel="stylesheet" href="/original-layout.css?v=20261011-restored">
 
   <link rel="stylesheet" href="/original-role-layout.css?v=20260926-role-portals" />
@@ -24,7 +25,7 @@
     @media(max-width:850px){.client-grid{grid-template-columns:1fr;}.client-actions{grid-template-columns:1fr;}.client-form{grid-template-columns:1fr;}.client-form textarea{grid-column:auto;}.client-top{align-items:flex-start;}}
   </style>
 <link rel="stylesheet" href="/workspace-theme.css?v=20261011-restored"><link rel="stylesheet" href="/operations-theme.css?v=20261011-restored"><script src="/workspace-theme.js?v=20261011-restored"></script><script src="/operations-ui.js?v=20261011-restored"></script><link rel="stylesheet" href="/compact-header.css"><link rel="stylesheet" href="/notification-center.css"><script src="/workspace-overlays.js"></script><link rel="stylesheet" href="/weekly-delivery.css"><link rel="stylesheet" href="/invoice-folders.css"><script src="/invoice-folders.js"></script></head>
-<body data-vv-role="viewer">
+<body data-vv-role="viewer" data-vv-entry-surface="client">
   <main class="client-shell">
     <header class="client-top vv-topbar">
       <button class="staff-icon-button" type="button" aria-label="Open navigation" onclick="document.getElementById('clientNavigation').hidden=!document.getElementById('clientNavigation').hidden">☰</button>
@@ -39,7 +40,7 @@
     <nav id="clientNavigation" class="client-home-nav" hidden><a href="#new-rfq">New RFQ</a><a href="/profile">My profile</a><a href="/support">Support</a></nav>
     <section id="clientRecords" class="client-card" hidden><h2>Your enquiries and documents</h2><div id="clientRecordList"></div></section>
 
-    <section class="client-hero">
+    <section class="client-hero vv-workspace-hero">
       <p class="eyebrow">Client Workspace</p>
       <h2>Your enquiries, in one place.</h2>
       <p>Submit a new RFQ, prepare the technical information our engineering team needs, or contact the team about an existing enquiry.</p>

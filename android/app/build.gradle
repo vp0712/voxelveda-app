@@ -6,6 +6,9 @@ def requestedVersionName = env['ANDROID_VERSION_NAME'] ?: '0.0.0-dev'
 def sourceCommit = env['ANDROID_SOURCE_COMMIT'] ?: env['GITHUB_SHA'] ?: 'working-tree'
 def signingNames = ['ANDROID_KEYSTORE_PATH','ANDROID_KEYSTORE_PASSWORD','ANDROID_KEY_ALIAS','ANDROID_KEY_PASSWORD']
 def hasSigning = signingNames.every { env[it] }
+def firebaseConfiguration = file('google-services.json')
+def pushConfigured = firebaseConfiguration.isFile() && firebaseConfiguration.length() > 0
+if (pushConfigured) apply plugin: 'com.google.gms.google-services'
 
 android {
     namespace = 'com.voxelveda.app'
@@ -18,6 +21,7 @@ android {
         versionName requestedVersionName
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         buildConfigField 'String', 'SOURCE_COMMIT', '"' + sourceCommit.replaceAll('[^A-Za-z0-9._-]', '') + '"'
+        buildConfigField 'boolean', 'PUSH_CONFIGURED', pushConfigured.toString()
         aaptOptions { ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~' }
     }
     buildFeatures { buildConfig true }

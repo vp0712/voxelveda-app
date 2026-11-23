@@ -1,3 +1,5 @@
+importScripts('/device-notices-sw.js');
+
 const CACHE_NAME = 'voxel-veda-public-v6-restored-20261011';
 const PUBLIC_ASSETS = ['/public-pages.css', '/favicon-192.png', '/favicon-512.png', '/logo.png'];
 

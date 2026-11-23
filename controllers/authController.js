@@ -1,13 +1,14 @@
 const bcrypt = require('bcryptjs');
 const pool = require('../config/db');
 const { activePermissionProjection, effectivePermissions } = require('../services/authorizationService');
-const { getRequestToken, setSessionCookie, clearSessionCookie } = require('../utils/session');
+const { getSessionCredential, hasSessionCookie, clearSessionCookie } = require('../utils/session');
 const { ensureUserLifecycleSchema } = require('../services/userLifecycleService');
 const { ensureSecuritySchema } = require('../services/securitySchema');
 const { revokeSession, logSecurityEvent } = require('../services/sessionService');
 const { validatePassword } = require('../services/passwordPolicy');
 const { createAuthenticatedSession } = require('../services/authSessionService');
 const { issueLoginChallenge, requiresMfa } = require('../services/mfaService');
+const deviceNotices = require('../services/deviceNoticeService');
 
 function normalizeRole(role) {
   return String(role || 'staff').trim().toLowerCase();
@@ -214,15 +215,23 @@ exports.customerRegister = async (req, res) => {
 };
 
 exports.logout = async (req, res) => {
-  const token = getRequestToken(req);
-  if (token) await revokeSession(token, 'LOGOUT').catch(() => {});
-  clearSessionCookie(req, res);
-  return res.json({ message: 'Logout successful' });
-};
-
-exports.refreshSessionCookie = async (req, res) => {
-  const token = getRequestToken(req);
-  if (!token) return res.status(401).json({ message: 'Authorization token missing' });
-  setSessionCookie(req, res, token);
-  return res.json({ message: 'Session refreshed' });
+  try {
+    const secret = process.env.JWT_SECRET;
+    if (!secret && hasSessionCookie(req)) throw new Error('JWT_SECRET is missing');
+    // An expired access token can revoke a session, but cannot authenticate a request.
+    const credential = getSessionCredential(req, secret, { ignoreExpiration: true });
+    if (credential && await revokeSession(credential.token, credential.decoded)) {
+      const { id, jti } = credential.decoded;
+      try {
+        await deviceNotices.onLogout({ user: { id }, session: { id: jti } }, { all: false });
+      } catch (error) {
+        console.error('DEVICE NOTICE LOGOUT SYNC:', error?.code || error?.name || 'UNKNOWN');
+      }
+    }
+    clearSessionCookie(req, res);
+    return res.json({ message: 'Logout successful' });
+  } catch (error) {
+    console.error('LOGOUT SERVICE UNAVAILABLE:', error?.code || error?.name || 'UNKNOWN');
+    return res.status(503).json({ message: 'Sign out could not be confirmed. Please retry.', code: 'AUTH_SERVICE_UNAVAILABLE' });
+  }
 };

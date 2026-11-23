@@ -220,9 +220,13 @@
     };
   }
 
-  const finishInitial = begin({ delay: 0, context: 'Preparing your workspace…' });
-  if (document.readyState === 'complete') window.setTimeout(finishInitial, 120);
-  else window.addEventListener('load', () => window.setTimeout(finishInitial, 80), { once: true });
+  // Entry surfaces paint their usable content immediately. Foreground work
+  // still uses the request-driven feedback above.
+  if (!body.hasAttribute('data-vv-entry-surface')) {
+    const finishInitial = begin({ delay: 0, context: 'Preparing your workspace…' });
+    if (document.readyState === 'complete') window.setTimeout(finishInitial, 120);
+    else window.addEventListener('load', () => window.setTimeout(finishInitial, 80), { once: true });
+  }
 
   document.addEventListener('click', (event) => {
     const anchor = event.target?.closest?.('a[href]');

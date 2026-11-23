@@ -1,30 +1,30 @@
-const crypto = require('crypto');
 const pool = require('../config/db');
 const { ensureSecuritySchema } = require('./securitySchema');
+const { sessionCredentialHash, tokenHash } = require('../utils/session');
 const { redactSensitive } = require('../utils/securityRedaction');
 const { isSecurityEventCapacityError, pruneSecurityEvents } = require('./securityEventRetentionService');
-
-const hashToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 
 async function createSession({ id, token, userId, sessionVersion, assuranceLevel = 1, expiresAt, req }) {
   await ensureSecuritySchema();
   await pool.query(
     `INSERT INTO auth_sessions
      (id, user_id, token_hash, assurance_level, session_version, ip_address, user_agent, expires_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, userId, hashToken(token), assuranceLevel, sessionVersion, req.ip || null, String(req.get('user-agent') || '').slice(0, 255), expiresAt]
+     VALUES (?, ?, ?, ?, ?, ?, ?, FROM_UNIXTIME(?))`,
+    [id, userId, tokenHash(token), assuranceLevel, sessionVersion, req.ip || null,
+      String(req.get('user-agent') || '').slice(0, 255), Math.floor(expiresAt.getTime() / 1000)]
   );
 }
 
 async function validateSession(token, decoded) {
-  if (!decoded?.jti) return null;
+  const hash = decoded?.jti && sessionCredentialHash(token, decoded);
+  if (!hash) return null;
   await ensureSecuritySchema();
   const [[session]] = await pool.query(
     `SELECT id, user_id, assurance_level, session_version, expires_at,
             step_up_verified_at, step_up_method
      FROM auth_sessions
-     WHERE id = ? AND token_hash = ? AND revoked_at IS NULL AND expires_at > NOW() LIMIT 1`,
-    [decoded.jti, hashToken(token)]
+     WHERE id = ? AND token_hash = ? AND user_id = ? AND revoked_at IS NULL AND expires_at > NOW() LIMIT 1`,
+    [decoded.jti, hash, decoded.id]
   );
   if (session) {
     await pool.query('UPDATE auth_sessions SET last_seen_at = NOW() WHERE id = ? AND last_seen_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)', [session.id]);
@@ -32,13 +32,15 @@ async function validateSession(token, decoded) {
   return session || null;
 }
 
-async function revokeSession(token, reason = 'LOGOUT') {
-  if (!token) return;
+async function revokeSession(token, decoded, reason = 'LOGOUT') {
+  const hash = decoded?.jti && sessionCredentialHash(token, decoded);
+  if (!hash) return false;
   await ensureSecuritySchema();
-  await pool.query(
-    'UPDATE auth_sessions SET revoked_at = NOW(), revoke_reason = ? WHERE token_hash = ? AND revoked_at IS NULL',
-    [reason, hashToken(token)]
+  const [result] = await pool.query(
+    'UPDATE auth_sessions SET revoked_at = NOW(), revoke_reason = ? WHERE id = ? AND token_hash = ? AND user_id = ? AND revoked_at IS NULL',
+    [reason, decoded.jti, hash, decoded.id]
   );
+  return result.affectedRows === 1;
 }
 
 async function revokeUserSessions(userId, reason) {

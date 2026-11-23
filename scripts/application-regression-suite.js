@@ -42,6 +42,8 @@ const checks = [
   'retained-theme-test.js',
   'workspace-overlay-test.js',
   'action-network-test.js',
+  'device-notices-test.js',
+  'ai-team-notice-test.js',
   'profile-avatar-test.js',
   'profile-avatar-component-test.js',
   'notification-center-test.js',

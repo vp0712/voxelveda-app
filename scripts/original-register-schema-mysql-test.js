@@ -63,8 +63,8 @@ async function main() {
   assert.equal(results.reduce((sum, value) => sum + value.skipped, 0), RETAINED_MIGRATIONS.length * 2);
   await assertOriginalRegisterSchemas(pool);
   const registeredMigrations = discoverMigrations(RETAINED_MIGRATIONS_DIR);
-  const migration = registeredMigrations[0], latestMigration = '20261114_timesheet_edit_receipts';
-  assert.equal(RETAINED_MIGRATIONS.length,5,'This release contains exactly the five reviewed additive migrations.');
+  const migration = registeredMigrations[0], latestMigration = '20261123_device_notices';
+  assert.equal(RETAINED_MIGRATIONS.length,7,'This release contains exactly the seven reviewed additive migrations.');
   assert.equal(RETAINED_MIGRATIONS.at(-1),latestMigration);
   assert(results.every(result=>result.schema_version===latestMigration),'Every concurrent runner reports the actual latest applied schema.');
   const [allLedger]=await pool.query('SELECT migration_id,checksum_sha256,status,applied_at,started_at,updated_at FROM schema_migrations ORDER BY migration_id');
@@ -131,9 +131,10 @@ async function main() {
   assert.equal(digest((await pool.query('SELECT * FROM bank_accounts'))[0]), archived, 'No retired table or historical record is changed');
   const [tables] = await pool.query('SELECT table_name AS table_name FROM information_schema.tables WHERE table_schema=DATABASE()');
   const weeklyTables = ['weekly_timesheet_deliveries','weekly_timesheet_delivery_versions'];
-  const expectedTables = [...Object.keys(TABLES), 'timesheet_pdf_snapshots', 'manual_report_snapshots', 'timesheet_edit_receipts', 'schema_migrations', 'bank_accounts', ...weeklyTables].sort();
+  const noticeTables = ['ai_team_events','ai_team_recipients','ai_team_preferences','notice_installations','notice_releases','notice_deliveries'];
+  const expectedTables = [...Object.keys(TABLES), 'timesheet_pdf_snapshots', 'manual_report_snapshots', 'timesheet_edit_receipts', 'schema_migrations', 'bank_accounts', ...weeklyTables, ...noticeTables].sort();
   assert.deepEqual(tables.map(table => table.table_name).sort(), expectedTables,
-    'Only the exact original registers, PDF cache, private manual-report metadata, reviewed timesheet edit receipts, immutable weekly delivery tables, migration ledger and protected retired fixture exist.');
+    'Only the exact retained tables and reviewed additive notice tables exist.');
   const [receiptColumns]=await pool.query("SELECT column_name AS column_name,data_type AS data_type,is_nullable AS is_nullable,character_maximum_length AS max_length,character_set_name AS character_set_name,collation_name AS collation_name FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='timesheet_edit_receipts' ORDER BY ordinal_position");
   assert.deepEqual(receiptColumns.map(column=>column.column_name),['timesheet_id','request_id','payload_sha256','response_json','version_no','created_by','created_at'],'The receipt stores only its reviewed durable request/result/version/actor metadata.');
   assert(receiptColumns.every(column=>column.is_nullable==='NO'&&!/blob|binary/.test(column.data_type)),'Receipt fields are required metadata, without document BLOB storage.');
@@ -149,10 +150,10 @@ async function main() {
   await pool.query('INSERT INTO timesheet_edit_receipts(timesheet_id,request_id,payload_sha256,response_json,version_no,created_by) VALUES(?,?,?,?,?,?)',[901,requestId,payloadHash,receiptBody,2,904]);
   const [[originalReceipt]]=await pool.query('SELECT * FROM timesheet_edit_receipts WHERE timesheet_id=? AND request_id=?',[901,requestId]);
   await assert.rejects(pool.query('INSERT INTO timesheet_edit_receipts(timesheet_id,request_id,payload_sha256,response_json,version_no,created_by) VALUES(?,?,?,?,?,?)',[901,requestId,'f'.repeat(64),'changed result must not overwrite',3,905]),error=>error.code==='ER_DUP_ENTRY','Concurrent/replayed request identities cannot create a second receipt or overwrite the first result.');
-  const receiptRestart=await runRetainedMigrations({pool,logger:{info(){}}});assert.equal(receiptRestart.applied,0);assert.equal(receiptRestart.skipped,5);assert.equal(receiptRestart.schema_version,latestMigration);
+  const receiptRestart=await runRetainedMigrations({pool,logger:{info(){}}});assert.equal(receiptRestart.applied,0);assert.equal(receiptRestart.skipped,7);assert.equal(receiptRestart.schema_version,latestMigration);
   const reopenedReceipt=await pool.getConnection();
   try{const [[preservedReceipt]]=await reopenedReceipt.query('SELECT * FROM timesheet_edit_receipts WHERE timesheet_id=? AND request_id=?',[901,requestId]);assert.equal(digest(preservedReceipt),digest(originalReceipt),'Fresh/upgrade schema restarts preserve exact receipt identity, payload hash, result bytes, actor, version and creation time.');assert.equal(preservedReceipt.response_json,receiptBody);}finally{reopenedReceipt.release();}
-  const [unchangedLedger]=await pool.query('SELECT migration_id,checksum_sha256,status,applied_at,started_at,updated_at FROM schema_migrations ORDER BY migration_id');assert.equal(digest(unchangedLedger),ledgerDigest,'All five migration checksums and timestamps survive repeat startup unchanged.');
+  const [unchangedLedger]=await pool.query('SELECT migration_id,checksum_sha256,status,applied_at,started_at,updated_at FROM schema_migrations ORDER BY migration_id');assert.equal(digest(unchangedLedger),ledgerDigest,'Applied migration checksums and timestamps survive repeat startup unchanged.');
   assert.equal(digest((await pool.query('SELECT * FROM bank_accounts'))[0]),archived,'Receipt retry/schema verification does not alter retired data.');
   const [manualColumns]=await pool.query("SELECT column_name AS column_name,data_type AS data_type,is_nullable AS is_nullable FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='manual_report_snapshots' ORDER BY ordinal_position");
   assert.deepEqual(manualColumns.map(column=>column.column_name),['id','created_by','source_type','descriptor_json','document_json','authority_sha256','source_sha256','pdf_storage_key','pdf_sha256','pdf_pages','filename','created_at']);

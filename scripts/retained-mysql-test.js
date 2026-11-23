@@ -52,7 +52,8 @@ function response() {
     headers: {},
     setHeader(name, value) { this.headers[name.toLowerCase()] = value; },
     set(name,value){this.setHeader(name,value);return this;},
-    cookie(name, value, options) { this.sessionCookie = { name, value, options }; },
+    cookies: new Map(),
+    cookie(name, value, options) { this.cookies.set(name, { value, options }); },
     send(body) { this.body = body; return this; },
     end(body) { this.body = body; return this; }
   };
@@ -209,16 +210,21 @@ async function testIdentityAndProfile() {
   const authenticated = await createAuthenticatedSession({ user, req: request, res: result });
   assert.equal(authenticated.user.role, 'finance_admin', 'Historical identity remains stable without granting a retired role authority.');
   assert.deepEqual(authenticated.user.permissions, ['VIEW_RFQS', 'VIEW_CONFIDENTIAL_FILES']);
-  assert.equal(result.sessionCookie.name, 'vv_session');
-  assert.equal(result.sessionCookie.options.httpOnly, true);
-  const token = result.sessionCookie.value;
+  const { value: token, options } = result.cookies.get('vv_session');
+  const { value: resumeToken } = result.cookies.get('vv_resume');
+  assert.equal(options.httpOnly, true);
   const decoded = jwt.verify(token, process.env.JWT_SECRET);
-  assert.deepEqual(decoded.permissions, ['VIEW_RFQS', 'VIEW_CONFIDENTIAL_FILES']);
+  const resume = jwt.verify(resumeToken, process.env.JWT_SECRET);
+  assert.equal(resume.id, 20);
+  assert.equal(decoded.permissions, undefined);
+  assert.equal(decoded.exp - decoded.iat, 900);
   assert.equal((await validateSession(token, decoded)).user_id, 20);
+  assert.equal((await validateSession(resumeToken, resume)).id, authenticated.sessionId);
   assert.equal(await revokeSessionById(21, authenticated.sessionId), false, 'Another account cannot revoke the owner session.');
   assert.ok(await validateSession(token, decoded));
   assert.equal(await revokeSessionById(20, authenticated.sessionId), true);
   assert.equal(await validateSession(token, decoded), null);
+  assert.equal(await validateSession(resumeToken, resume), null);
 
   const profile = require('../controllers/profileController');
   await pool.query("INSERT INTO user_profiles(user_id,mobile_number) VALUES(21,'+61 400 000 021')");

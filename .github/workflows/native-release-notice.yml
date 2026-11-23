@@ -1,0 +1,47 @@
+name: Verify store availability and record update notice
+on:
+  schedule:
+    - cron: '19 */4 * * *'
+  workflow_dispatch:
+    inputs:
+      platform:
+        required: true
+        type: choice
+        options: [android, ios]
+      version:
+        description: Android Play version code or iOS App Store version
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: voxel-veda-native-release-notices
+  cancel-in-progress: false
+jobs:
+  verify-and-record:
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify current production storefront and notify eligible installations
+        env:
+          VV_PLATFORM: ${{ inputs.platform }}
+          VV_VERSION: ${{ inputs.version }}
+          DEVICE_RELEASE_WEBHOOK_SECRET: ${{ secrets.DEVICE_RELEASE_WEBHOOK_SECRET }}
+          DEVICE_RELEASE_PLAY_READER_JSON: ${{ secrets.DEVICE_RELEASE_PLAY_READER_JSON }}
+          DEVICE_PUSH_APPLE_STORE_ID: ${{ vars.DEVICE_PUSH_APPLE_STORE_ID }}
+        run: |
+          if [ -n "$VV_PLATFORM" ]; then
+            node scripts/publish-device-release-notice.js "$VV_PLATFORM" "$VV_VERSION"
+          else
+            if [ -n "$DEVICE_RELEASE_PLAY_READER_JSON" ]; then
+              node scripts/publish-device-release-notice.js android
+            fi
+            if [ -n "$DEVICE_PUSH_APPLE_STORE_ID" ]; then
+              node scripts/publish-device-release-notice.js ios
+            fi
+          fi

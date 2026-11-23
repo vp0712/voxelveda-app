@@ -44,6 +44,8 @@ jobs:
           node scripts/core-audit-isolation-test.js
       - name: Disposable MySQL original schema, record preservation, PDF grants and atomic email claims
         run: node scripts/retained-mysql-test.js
+      - name: Verify durable release and private device alert isolation in MySQL
+        run: node scripts/device-notices-mysql-test.js
       - name: Complete QMS registers, full authorised PDFs and targeted alerts in real MySQL
         env:
           QMS_PROOF_DIR: ${{ runner.temp }}/qms-register-proof

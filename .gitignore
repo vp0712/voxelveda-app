@@ -3,6 +3,7 @@ node_modules/
 deployment/wordpress/vendor/
 android/.gradle/
 android/app/build/
+android/app/google-services.json
 android/build/
 ios/App/DerivedData/
 

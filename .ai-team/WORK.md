@@ -76,3 +76,10 @@ specialists, starting with at most four concurrent workers, inheriting the paren
 model and assigning one writer per file area. Integrate changes, run task-appropriate
 checks, obtain independent review and record observed results here. Use matching
 `ecc-*` specialists/recipes when their dependencies actually fit this application.
+
+## Mobile entry, session and device notices
+
+- Baseline `46ecf4965a168f5b89b8273e272a1ac2dc101b49`. The coordinator integrates the `vv-ui`, `vv-mobile`, `vv-security`, `vv-notifications` and `vv-qa` assignments on `feature/mobile-entry-device-notices`.
+- Fixed ordinary 96-hour sessions, shorter access and privileged assurance, UI surfaces, retained sidebar and chart behaviour, device opt-ins, verified release notices and recipient-scoped AI Team activity.
+- Local evidence includes UTC and Melbourne regression builds, responsive Chromium sign-in and chart comparisons, real MySQL delivery/session checks and simulated provider/device behaviour. Setup and signing requirements are in [Device notices](../docs/DEVICE_NOTICES.md).
+- Pending activation requires reviewed deployment, provider and producer configuration, signed push-enabled mobile builds and receipt checks on enrolled test devices.

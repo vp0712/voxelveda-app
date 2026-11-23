@@ -92,13 +92,21 @@ async function run() {
   assert.equal(login.context.safeReturnTo('viewer'), '/security?mfa_setup=required');
   login.context.window.location.search = '?returnTo=%2Fprofile';
   assert.equal(login.context.safeReturnTo('viewer'), '/profile');
-  const saved = harness('login.js', async () => response(200, { user: { role: 'staff' } }), { search: '?returnTo=%2Fsecurity' });
-  await saved.context.redirectSavedSession();
+  const saved = harness('login.js', async () => response(200, { user: { id: 56, role: 'staff' } }), { search: '?returnTo=%2Fsecurity' });
+  assert.equal(await saved.context.redirectSavedSession(), 'redirected');
   assert.deepEqual(saved.destinations, ['/security'], 'saved sessions retain current account navigation');
-  for (const target of ['/admin', '/finance/reports/RPT_example/view', '/portal/staff', '/request-quote', '//evil.invalid', '/security?returnTo=%2Fdashboard']) {
+  const incompleteIdentity = harness('login.js', async () => response(200, { user: { role: 'staff' } }));
+  assert.equal(await incompleteIdentity.context.redirectSavedSession(), 'unavailable');
+  assert.deepEqual(incompleteIdentity.destinations, [], 'a malformed identity response does not leave the entry screen');
+  assert.equal(incompleteIdentity.context.localStorage.getItem('user'), 'cached', 'a malformed response does not confirm sign-out');
+  const expired = harness('login.js', async () => response(401, {}));
+  assert.equal(await expired.context.redirectSavedSession(), 'anonymous');
+  assert.equal(expired.context.localStorage.getItem('user'), null, 'a confirmed expired session clears saved identity');
+  for (const target of ['/admin', '/finance/reports/RPT_example/view', '/portal/staff', '/request-quote', '//evil.invalid', '/security?returnTo=%2Fdashboard', '/dashboard?team_activity=1']) {
     const mfa = harness('mfa.js', async () => response(200, { user: { role: 'finance_admin' } }), { session: { vv_mfa_challenge: 'test-challenge', vv_mfa_return_to: target } });
     await mfa.get('mfaForm').events.submit(event);
-    assert.deepEqual(mfa.destinations, [['/admin','/portal/staff'].includes(target)||target.startsWith('/security?') ? target : '/dashboard']);
+    const allowed = ['/admin', '/portal/staff', '/security?returnTo=%2Fdashboard', '/dashboard?team_activity=1'];
+    assert.deepEqual(mfa.destinations, [allowed.includes(target) ? target : '/dashboard']);
     assert.equal(mfa.context.sessionStorage.getItem('vv_mfa_challenge'), null);
   }
   console.log('Retained workspace regression passed: account identity/retry/error states, confirmed/failed logout, absence of removed business workflows, safe universal login and MFA navigation.');

@@ -9,6 +9,7 @@ import android.os.ParcelFileDescriptor;
 import android.provider.Settings;
 import android.util.Base64;
 import androidx.activity.result.ActivityResult;
+import androidx.core.app.NotificationManagerCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.*;
 import com.getcapacitor.annotation.*;
@@ -30,6 +31,8 @@ public class VoxelVedaAppPlugin extends Plugin {
         result.put("packageId", getContext().getPackageName()); result.put("versionName", BuildConfig.VERSION_NAME);
         result.put("versionCode", BuildConfig.VERSION_CODE); result.put("sourceCommit", BuildConfig.SOURCE_COMMIT);
         result.put("buildType", BuildConfig.BUILD_TYPE); result.put("platform", "Android");
+        result.put("pushConfigured", BuildConfig.PUSH_CONFIGURED);
+        result.put("notificationsEnabled", NotificationManagerCompat.from(getContext()).areNotificationsEnabled());
         call.resolve(result);
     }
 

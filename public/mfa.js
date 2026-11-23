@@ -6,9 +6,15 @@
   function destination(user) {
     const home = '/dashboard';
     const requested = sessionStorage.getItem('vv_mfa_return_to') || '';
-    if (!requested.startsWith('/') || requested.startsWith('//') || requested.includes('\\')) return home;
+    if (!requested.startsWith('/') || requested.startsWith('//') || requested.includes('\\') || /[\u0000-\u001f\u007f]/.test(requested)) return home;
     const path = requested.split(/[?#]/, 1)[0];
-    const allowed=['/dashboard','/security','/profile','/admin','/client','/account','/quality','/shop-floor','/attendance-terminal','/a','/attendance/scan','/invoice/view','/document/view'];
+    const allowed = [
+      '/dashboard', '/security', '/profile', '/admin', '/client', '/account', '/quality', '/shop-floor',
+      '/attendance-terminal', '/a', '/attendance/scan', '/invoice/view', '/document/view', '/employee-id',
+      '/careers-admin', '/rfqs', '/quotations', '/invoices', '/customers', '/suppliers', '/procurement',
+      '/stock', '/inventory', '/raw-material', '/packaging', '/expenses', '/workforce', '/timesheets',
+      '/roster', '/staff', '/compliance', '/forms', '/settings', '/meetings', '/tasks', '/trash', '/approvals'
+    ];
     return allowed.includes(path)||/^\/portal\/(staff|manager|supervisor|hr|production|sales)$/.test(path)?requested:home;
   }
   function clearChallenge() {
@@ -39,7 +45,7 @@
     const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),20000);
     try{
     const endpoint = setup ? '/api/auth/mfa/setup/confirm' : '/api/auth/mfa/verify';
-    const response = await fetch(endpoint, { signal:controller.signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ challenge_token: challenge, code: document.getElementById('mfaCode').value }) });
+    const response = await fetch(endpoint, { signal:controller.signal, method: 'POST', headers: { 'Content-Type': 'application/json', ...window.VVDeviceNotices?.headers?.() }, body: JSON.stringify({ challenge_token: challenge, code: document.getElementById('mfaCode').value }) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) return setStatus(data.message || 'Verification failed.');
     localStorage.setItem('user', JSON.stringify(data.user));

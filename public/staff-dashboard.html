@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Voxel Veda Workforce Panel</title>
+  <link rel="stylesheet" href="/app-entry-design.css">
 <link rel="stylesheet" href="/original-layout.css?v=20261011-restored">
 
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
@@ -20,7 +21,7 @@
   <meta name="twitter:image" content="https://app.voxelveda.com/og-image.png?v=20260703-brand" />  <link rel="stylesheet" href="/original-role-layout.css?v=20260926-role-portals" />
 <link rel="stylesheet" href="/workspace-theme.css?v=20261011-restored"><link rel="stylesheet" href="/operations-theme.css?v=20261013-procurement-pdf"><script src="/workspace-theme.js?v=20261011-restored"></script><script src="/operations-ui.js?v=20261011-restored"></script><link rel="stylesheet" href="/staff-home.css?v=20261013-staff-mobile"><link rel="stylesheet" href="/notification-center.css?v=20261013-staff-mobile"><link rel="stylesheet" href="/weekly-delivery.css"><link rel="stylesheet" href="/invoice-folders.css"><script src="/invoice-folders.js"></script></head>
 
-<body class="staff-portal">
+<body class="staff-portal" data-vv-entry-surface="staff">
   <div class="mobile-sidebar-backdrop" data-mobile-menu-action="close" aria-hidden="true"></div>
 
   <div class="app-shell">
@@ -141,7 +142,7 @@
       <!-- PROFILE -->
       <section id="profileSection" class="page-section hidden-section">
         <div class="staff-profile-shell">
-          <div class="staff-profile-hero">
+          <div class="staff-profile-hero vv-workspace-hero">
             <div id="profileAvatar" class="staff-avatar" data-avatar-self></div>
             <h2 id="profileName">Staff Member</h2>
             <span id="profileRoleBadge" class="staff-role-pill">Staff</span>
@@ -227,7 +228,7 @@
 
       <!-- DASHBOARD -->
       <section id="dashboardSection" class="page-section staff-home-section">
-        <div class="staff-home-greeting">
+        <div class="staff-home-greeting vv-workspace-hero">
           <div><p id="staffHomeDate" class="staff-home-eyebrow">Checking workplace time...</p><h1 id="staffHomeGreeting">Welcome</h1><p id="staffHomeTeam">Loading your workspace...</p></div>
           <button type="button" class="staff-icon-button" id="staffHomeRefresh" aria-label="Refresh home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M18.5 7A8 8 0 0 0 5 6M5.5 17A8 8 0 0 0 19 18"/></svg></button>
         </div>

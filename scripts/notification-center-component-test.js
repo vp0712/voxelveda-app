@@ -6,12 +6,13 @@ const vm=require('node:vm');
 const root=path.join(__dirname,'..');
 class CustomEvent extends Event {constructor(type,options={}){super(type);this.detail=options.detail;}}
 const flush=async()=>{for(let i=0;i<6;i++)await new Promise(resolve=>setImmediate(resolve));};
-function fixture({profile=false}={}) {
+function fixture({profile=false,bellId='staffNotificationBell',search=''}={}) {
   const document=new EventTarget(),window=new EventTarget(),values=new Map([['token','account-A'],['user',JSON.stringify({id:1})]]),requests=[],navigation=[];
   class Element extends EventTarget {
     constructor(tag='div'){super();this.tagName=tag.toLowerCase();this.children=[];this.dataset={};this.attrs={};this.style={setProperty(key,value){this[key]=value;}};this.hidden=false;this.disabled=false;this.isConnected=true;this._text='';this._html='';const classes=new Set();this.classList={add(...names){names.forEach(name=>classes.add(name));},remove(...names){names.forEach(name=>classes.delete(name));},contains:name=>classes.has(name),toggle(name,on){if(on===undefined)on=!classes.has(name);on?classes.add(name):classes.delete(name);}};}
     set className(value){this._class=value;this.classList.add(...String(value).split(/\s+/));}get className(){return this._class || '';}
     append(...children){children.forEach(child=>{if(child.parentElement)child.remove();this.children.push(child);child.parentElement=this;child.isConnected=true;});}appendChild(child){this.append(child);return child;}
+    insertAdjacentElement(position,child){assert.equal(position,'afterend');const siblings=this.parentElement.children,index=siblings.indexOf(this);siblings.splice(index+1,0,child);child.parentElement=this.parentElement;child.isConnected=true;return child;}
     replaceChildren(...children){this.children.forEach(child=>{child.isConnected=false;child.parentElement=null;});this.children=[];this._text='';this._html='';this.append(...children);}
     remove(){if(this.parentElement)this.parentElement.children=this.parentElement.children.filter(child=>child!==this);this.parentElement=null;this.isConnected=false;}
     set textContent(value){this.replaceChildren();this._text=String(value);}get textContent(){return this._text+this._html+this.children.map(child=>child.textContent).join('');}
@@ -31,12 +32,13 @@ function fixture({profile=false}={}) {
     }get innerHTML(){return this._html;}
   }
   document.readyState='loading';document.hidden=false;document.body=new Element('body');document.activeElement=document.body;
-  const bell=new Element('button');bell.id='staffNotificationBell';bell.setAttribute('data-notification-toggle','');const badge=new Element('span');badge.id='staffNotificationBadge';const panel=new Element('section');panel.id='staffNotificationPanel';panel.setAttribute('data-notification-panel','');const main=new Element('main');main.className='shell';
+  const bell=new Element('button');bell.id=bellId;bell.setAttribute('data-notification-toggle','');const badge=new Element('span');badge.id='staffNotificationBadge';const panel=new Element('section');panel.id='staffNotificationPanel';panel.setAttribute('data-notification-panel','');const main=new Element('main');main.className='shell';
   document.body.append(main);if(!profile)document.body.append(bell,badge,panel);
   document.createElement=tag=>new Element(tag);document.createTextNode=value=>{const element=new Element('#text');element.textContent=value;return element;};document.querySelectorAll=selector=>document.body.querySelectorAll(selector);document.querySelector=selector=>selector==='main.shell,main'?main:document.body.querySelector(selector);document.getElementById=id=>document.body.querySelector('#'+id);
   window.VoxelAvatar={authHeaders:()=>({Authorization:'Bearer '+values.get('token')})};
   const fetch=(url,options)=>new Promise((resolve,reject)=>{requests.push({url,options,resolve(body,status=200){this.done=true;resolve(Response.json(body,{status}));},reject(error){this.done=true;reject(error);}});}); // Deliberately ignores abort to prove stale responses cannot render.
-  const location={origin:'https://fixture.invalid',pathname:profile?'/profile':'/portal/staff',search:'',hash:'',assign:url=>navigation.push(url)};
+  const location={origin:'https://fixture.invalid',pathname:profile?'/profile':'/portal/staff',search,hash:'',assign:url=>navigation.push(url)};
+  window.history={state:null,replaceState(state,title,url){location.search=new URL(url,location.origin).search;navigation.push(url);}};
   const context=vm.createContext({window,document,localStorage:{getItem:key=>values.get(key)||null},location,fetch,URL,URLSearchParams,HTMLElement:Element,AbortController,CustomEvent,setTimeout,clearTimeout,requestAnimationFrame:fn=>fn(),innerWidth:1000,innerHeight:800,console});
   vm.runInContext(fs.readFileSync(path.join(root,'public/workspace-overlays.js'),'utf8'),context);vm.runInContext(fs.readFileSync(path.join(root,'public/notification-center.js'),'utf8'),context);
   const next=url=>{const row=requests.find(item=>!item.done&&!item.claimed&&item.url===url);assert.ok(row,'Expected request '+url);row.claimed=true;return row;};
@@ -64,4 +66,39 @@ async function profilePreferences() {
   f.switchTo('C',3,'vv:auth-changed');patches.forEach(row=>row.resolve({success:true}));await saving;assert.equal(form.children.length,0);assert.doesNotMatch(f.document.querySelector('[data-preference-status]').textContent,/Preferences saved/);assert.ok(patches.every(row=>row.options.signal.aborted));
   f.document.querySelector('[data-preference-status]').querySelector('button').dispatchEvent(new Event('click'));f.next('/api/notifications/preferences').resolve({preferences:[{category:'HR',in_app_enabled:0}]});await flush();assert.equal(form.querySelectorAll('input').find(input=>input.name==='HR').checked,false,'Reload uses current-account preferences.');
 }
-(async()=>{await accountSwitch();await profilePreferences();console.log('PASS shared notification component account-switch isolation, stale request ownership, protected record lifecycle, read/poll serialization and profile preferences.');})().catch(error=>{console.error(error.stack);process.exitCode=1;});
+async function aiTeamFeed() {
+  const f=fixture({bellId:'notificationBell',search:'?view=home&team_activity=1'});f.start();
+  const select=selector=>f.document.querySelector(selector);
+  const team=select('[data-ai-team-toggle]');
+  assert.equal(f.document.body.children.indexOf(team),f.document.body.children.indexOf(f.bell)+1);
+  assert.equal(team.hidden,true,'The control waits for a server eligibility decision.');
+  f.next('/api/notifications/unread-count').resolve({unread:2});
+  f.next('/api/ai-team/status').resolve({eligible:true,in_app_enabled:true,push_enabled:false,unread:1});
+  await flush();
+  assert.equal(team.hidden,false);assert.equal(select('[data-ai-team-badge]').textContent,'1');assert.equal(f.badge.textContent,'2');
+  const event={id:'31',source:'GITHUB_ACTIONS',title:'Workflow run finished',summary:'Release verification succeeded',created_at:'2026-11-23T01:00:00.000Z',is_read:0};
+  f.next('/api/ai-team/events').resolve({items:[event],before:null});
+  await flush();
+  assert.match(select('#vvAiTeamPanel').textContent,/GitHub Actions.*Workflow run finished/);
+  assert.equal(f.window.VoxelOverlay.active,'ai-team');assert.deepEqual(f.navigation,['/portal/staff?view=home']);
+  select('.vv-team-entry').dispatchEvent(new Event('click'));
+  f.next('/api/ai-team/events/31/open').resolve({item:{...event,reference_label:'Run 16 · Attempt 1'},unread:0});
+  await flush();
+  assert.match(select('#vvAiTeamPanel').textContent,/Run 16/);assert.equal(select('[data-ai-team-badge]').hidden,true);
+  f.switchTo('B',2);const statusB=f.next('/api/ai-team/status');
+  assert.equal(select('#vvAiTeamPanel').hidden,true);assert.doesNotMatch(select('#vvAiTeamPanel').textContent,/Run 16/);
+  statusB.resolve({eligible:false});await flush();assert.equal(team.hidden,true);
+  const denied=await (async()=>{const opening=f.window.VoxelAITeam.openFromNotice();f.next('/api/ai-team/status').resolve({eligible:false});return opening;})();
+  assert.equal(denied,false);assert.equal(f.badge.hidden,true);
+  for(const row of f.requests)if(!row.done)row.resolve({unread:0});await flush();
+
+  const staff=fixture();staff.start();staff.next('/api/ai-team/status').resolve({eligible:true,in_app_enabled:true,push_enabled:false,unread:0});
+  staff.next('/api/notifications/unread-count').resolve({unread:0});await flush();
+  const staffTeam=staff.document.querySelector('[data-ai-team-toggle]');
+  assert.equal(staff.document.body.children.indexOf(staffTeam),staff.document.body.children.indexOf(staff.bell)+1);
+  staffTeam.dispatchEvent(new Event('click'));staff.next('/api/ai-team/events').resolve({items:[],before:null});await flush();
+  assert.match(staff.document.querySelector('#vvAiTeamPanel').textContent,/No AI Team activity yet/);
+  staff.document.querySelector('[data-ai-team-close]').dispatchEvent(new Event('click'));
+  assert.equal(staff.window.VoxelOverlay.active,null);assert.equal(staff.document.activeElement,staffTeam);
+}
+(async()=>{await accountSwitch();await profilePreferences();await aiTeamFeed();console.log('PASS notification isolation, read/poll serialization, preferences and both AI Team bell anchors, deep links, unread counts, permitted detail and empty state.');})().catch(error=>{console.error(error.stack);process.exitCode=1;});
