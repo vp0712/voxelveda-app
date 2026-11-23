@@ -112,12 +112,16 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
         run: |
           ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/existing-upload-key.jks"
           export ANDROID_KEYSTORE_PATH
-          trap 'rm -f "$ANDROID_KEYSTORE_PATH"' EXIT
+          trap 'rm -f "$ANDROID_KEYSTORE_PATH" android/app/google-services.json' EXIT
           umask 077
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+          if [ -n "$ANDROID_GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$ANDROID_GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          fi
           npx cap sync android
           android/gradlew -p android --no-daemon :app:bundleRelease
           jarsigner -verify android/app/build/outputs/bundle/release/app-release.aab

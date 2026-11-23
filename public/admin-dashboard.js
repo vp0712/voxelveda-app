@@ -164,15 +164,16 @@ function redirectToLogin(message = 'Your session expired. Please login again.') 
 
 async function logout() {
   try {
-    await fetch('/api/auth/logout', {
+    const response = await fetch('/api/auth/logout', {
       method: 'POST',
-      credentials: 'same-origin',
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
+      credentials: 'same-origin'
     });
-  } finally {
+    if (!response.ok) throw new Error('Logout unavailable');
     window.VoxelAvatar?.clear();
     ['user', 'role', 'token'].forEach(key => localStorage.removeItem(key));
-    window.location.href = '/login';
+    window.location.replace('/login');
+  } catch {
+    showToast('Sign out could not be confirmed. Please retry when connected.', { kind: 'error' });
   }
 }
 

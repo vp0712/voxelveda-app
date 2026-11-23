@@ -100,6 +100,8 @@ function applicationFixture() {
     './services/botChallengeService':{botChallenge:()=>pass},
     './services/publicSubmissionDedupeService':{publicSubmissionDedupe:()=>pass},
     './routes/careersRoutes':{publicRouter:router(),adminRouter:router()},
+    './routes/deviceNoticeRoutes':express.Router(),
+    './routes/aiTeamRoutes':{feed:express.Router(),webhook:(_req,res)=>res.sendStatus(403),runner:(_req,res)=>res.sendStatus(403)},
     './controllers/rfqController':{createRFQ:(req,res)=>res.status(400).json({code:'VALIDATION_FAILED'})},
     './controllers/attendanceController':{publicShiftQrToken:pass},
     './controllers/aiLeadController':{createLead:pass},

@@ -48,13 +48,14 @@ Module._load = function fixtureLoad(request, parent) {
   if (target === path.join(project, 'config/db')) return { query, getConnection:async()=>({query,beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){}}) };
   if (target === path.join(project, 'services/userLifecycleService')) return { ensureUserLifecycleSchema: async () => {} };
   if (target === path.join(project, 'services/securitySchema')) return { ensureSecuritySchema: async () => {} };
+  if (target === path.join(project, 'services/deviceNoticeService')) return { onSignIn: async () => {}, onLogout: async () => {} };
   if (target === path.join(project, 'services/sessionService')) return {
     validateSession: async (token, decoded) => {
-      const saved = sessions.get(crypto.createHash('sha256').update(token).digest('hex'));
+      const saved = sessions.get(require('../utils/session').sessionCredentialHash(token, decoded));
       return saved && Number(saved.user_id) === Number(decoded.id) ? saved : null;
     },
     createSession:async entry=>{sessions.set(crypto.createHash('sha256').update(entry.token).digest('hex'),{...entry,user_id:entry.userId,session_version:entry.sessionVersion,assurance_level:entry.assuranceLevel});},
-    revokeSession:async token=>{sessions.delete(crypto.createHash('sha256').update(token).digest('hex'));},
+    revokeSession:async (token, decoded)=>sessions.delete(require('../utils/session').sessionCredentialHash(token, decoded)),
     logSecurityEvent: async () => {}
   };
   if (target === path.join(project, 'services/securityContextService')) return {
@@ -131,7 +132,11 @@ async function makeServer(publicDirectory, photo, configure) {
     <div id="avatarObserverInvalid" data-avatar-user-id="NaN" data-avatar-name="Synthetic malformed fixture"></div>
     <button id="avatarObserverResponsive" type="button">Check responsiveness</button><output id="avatarObserverClicks">0</output><div id="avatarObserverUnrelated"></div></body></html>`));
   app.post('/api/security/csp-report', (_req, res) => res.sendStatus(204));
+  app.get('/api/device-notices/configuration', (_req, res) => res.json({ push_available: false, latest_release: null }));
+  app.get('/api/device-notices/installation', (_req, res) => res.json({ registered: false }));
   app.use('/api', auth);
+  app.post('/api/device-notices/installation/account', (_req, res) => res.json({ eligible: false, registered: false }));
+  app.get('/api/ai-team/status', (_req, res) => res.json({ eligible: false }));
   app.get('/api/auth/me', authController.me);
   app.get('/api/profile', (req, res) => {
     const user = identities.get(Number(req.user.id));
@@ -842,7 +847,7 @@ async function run() {
           assert.equal(await page.locator('[data-staff-correction-review]').count(), 0, 'Own staff cannot approve their correction request');
           await page.keyboard.press('Escape');
         }
-        await page.goto(fixture.origin + '/profile', { waitUntil: 'networkidle' });
+        await page.goto(fixture.origin + '/profile', { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => document.getElementById('displayName')?.textContent.includes('Synthetic Staff Fixture'));
         await page.screenshot({ path: path.join(output, `${phase}-profile-initial-${viewport.name}.png`), fullPage: true, animations: 'disabled' });
         fixture.state.photo = true;

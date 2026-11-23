@@ -34,13 +34,13 @@
     if (state === 'failed'){binding.failureTitle=message || 'Photo could not be loaded. Open My Profile and retry.';binding.target.title=binding.failureTitle;}
     notify(binding,state,message);
   }
-  function clear() {
+  function clear(reason) {
     generation++; pendingProfile = null; profile = null; lastRefresh = 0;
     profileController?.abort();profileController=null;
     for (const photo of photos.values()) { photo.controller?.abort(); if(photo.url) URL.revokeObjectURL(photo.url); }
     photos.clear();
     for (const binding of bindings.values()) { binding.name = binding.self ? '' : binding.name; fallback(binding,'missing'); }
-    window.dispatchEvent(new CustomEvent('vv:avatar-clear'));
+    window.dispatchEvent(new CustomEvent('vv:avatar-clear',{detail:{reason}}));
   }
   function checkIdentity() { const next=fingerprint(); if(next!==identity){clear();identity=next;} return identity; }
   function validUrl(value, userId, self) {
@@ -146,7 +146,7 @@
   window.addEventListener('storage',event=>{if(!event.key || ['token','user'].includes(event.key)){checkIdentity();refreshSelf({force:true});}});
   window.addEventListener('vv:auth-changed',()=>{clear();identity=fingerprint();refreshSelf({force:true});});
   window.addEventListener('vv:profile-photo-updated',()=>refreshSelf({force:true}));
-  window.addEventListener('pageshow',()=>refreshSelf({force:true}));window.addEventListener('focus',()=>refreshSelf());window.addEventListener('pagehide',()=>clear());
+  window.addEventListener('pageshow',()=>refreshSelf({force:true}));window.addEventListener('focus',()=>refreshSelf());window.addEventListener('pagehide',()=>clear('pagehide'));
   channel?.addEventListener('message',event=>{
     if(event.data?.type!=='profile-changed')return;
     const userId=Number(event.data.userId);if(!Number.isSafeInteger(userId)||userId<1)return;

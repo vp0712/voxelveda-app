@@ -95,6 +95,21 @@ jobs:
           name: invoice-company-folders-${{ github.sha }}
           path: ${{ runner.temp }}/invoice-folder-proof
           retention-days: 30
+      - name: Verify responsive sign-in, returning-session entry and device notice surfaces
+        if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          UI_PROOF_DIR: ${{ runner.temp }}/entry-design-proof
+        run: |
+          timeout --signal=TERM --kill-after=10s 180s node scripts/app-entry-browser-test.js
+          timeout --signal=TERM --kill-after=10s 180s node scripts/device-notice-ui-browser-test.js
+      - name: Preserve entry design screenshots
+        if: ${{ always() && steps.browser-tools.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-entry-design-${{ github.sha }}
+          path: ${{ runner.temp }}/entry-design-proof
+          retention-days: 30
       - name: Verify compact direct actions against the current invoice baseline
         if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
         env:

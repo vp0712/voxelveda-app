@@ -1,19 +1,15 @@
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 const jwt = require('jsonwebtoken');
 const { createSession } = require('./sessionService');
-const { setSessionCookie } = require('../utils/session');
+const { RESUME_TYPE, sessionWindowSeconds, setResumeCookie, setAccessCookie } = require('../utils/session');
 const { activePermissionProjection } = require('./authorizationService');
+const deviceNotices = require('./deviceNoticeService');
 
 function normalizeRole(value) { return String(value || 'staff').trim().toLowerCase(); }
 
-function sessionDuration(role) {
-  return ['super_admin', 'admin', 'finance_admin', 'accountant', 'hr'].includes(normalizeRole(role))
-    ? (process.env.PRIVILEGED_SESSION_EXPIRES_IN || '2h')
-    : (process.env.JWT_EXPIRES_IN || '8h');
-}
-
 async function createAuthenticatedSession({ user, req, res, assuranceLevel = 1 }) {
-  if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is missing');
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error('JWT_SECRET is missing');
   const sessionId = crypto.randomUUID();
   const publicUser = {
     id: user.id,
@@ -23,18 +19,22 @@ async function createAuthenticatedSession({ user, req, res, assuranceLevel = 1 }
     role: normalizeRole(user.role),
     permissions: activePermissionProjection(user.permissions)
   };
-  const token = jwt.sign({
-    id: user.id,
-    email: publicUser.email,
-    username: publicUser.username,
-    role: publicUser.role,
-    permissions: publicUser.permissions,
-    session_version: Number(user.session_version || 1),
-    assurance_level: assuranceLevel
-  }, process.env.JWT_SECRET, { expiresIn: sessionDuration(user.role), jwtid: sessionId });
-  const decoded = jwt.decode(token);
-  await createSession({ id: sessionId, token, userId: user.id, sessionVersion: Number(user.session_version || 1), assuranceLevel, expiresAt: new Date(Number(decoded.exp) * 1000), req });
-  setSessionCookie(req, res, token);
+  const signedInAt = Math.floor(Date.now() / 1000);
+  const expiry = signedInAt + sessionWindowSeconds(publicUser.role);
+  const decoded = { id: user.id, session_type: RESUME_TYPE, iat: signedInAt, exp: expiry, jti: sessionId };
+  const token = jwt.sign(decoded, secret, { algorithm: 'HS256' });
+  const expiresAt = new Date(expiry * 1000);
+  await createSession({
+    id: sessionId, token, userId: user.id, sessionVersion: Number(user.session_version || 1),
+    assuranceLevel, expiresAt, req
+  });
+  try {
+    await deviceNotices.onSignIn(req, user.id);
+  } catch (error) {
+    console.error('DEVICE NOTICE SIGN-IN SYNC:', error?.code || error?.name || 'UNKNOWN');
+  }
+  setResumeCookie(req, res, token, expiresAt);
+  setAccessCookie(req, res, { token, decoded }, secret);
   return { user: publicUser, sessionId };
 }
 

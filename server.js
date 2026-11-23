@@ -28,6 +28,7 @@ const { backgroundJobService } = require('./services/backgroundJobService');
 const {startWeeklyTimesheetScheduler,stopWeeklyTimesheetScheduler,getWeeklyTimesheetSchedule}=require('./services/weeklyTimesheetScheduler');
 const {startWorkflowSlaScheduler,stopWorkflowSlaScheduler}=require('./services/workflowEscalationService');
 const {startProcurementImportWorker,stopProcurementImportWorker}=require('./services/procurementImportService');
+const {startDeviceNoticeWorker,stopDeviceNoticeWorker}=require('./services/deviceNoticeService');
 const { ensureSecuritySchema } = require('./services/securitySchema');
 const { ensureSecurityOperationsSchema } = require('./services/securityOperationsSchema');
 const { ensureOperationalTrustSchema } = require('./services/operationalTrustSchema');
@@ -232,9 +233,10 @@ async function initializeWorkers() {
   const weeklySchedule=getWeeklyTimesheetSchedule();
   const emailStarted=startEmailQueueWorker(),weeklyStarted=startWeeklyTimesheetScheduler(),workflowStarted=startWorkflowSlaScheduler();
   const importStarted=startProcurementImportWorker();
+  const noticesStarted=startDeviceNoticeWorker();
   setCriticalService('procurement_import_worker',importStarted?CONTROL_STATES.OPERATIONAL:CONTROL_STATES.DEGRADED,
     'Durable source extraction registered with bounded parsers and fenced per-file leases; no automatic business-record confirmation');
-  const started = [emailStarted,weeklyStarted,workflowStarted,importStarted].filter(Boolean).length;
+  const started = [emailStarted,weeklyStarted,workflowStarted,importStarted,noticesStarted].filter(Boolean).length;
   setCriticalService('weekly_timesheet_worker',weeklyStarted?CONTROL_STATES.OPERATIONAL:CONTROL_STATES.DEGRADED,
     `Worked-only weekly timesheet email job ${weeklyStarted?'registered and scheduled':'disabled'}; registered recipient; ${weeklySchedule.timezone}; next due ${weeklySchedule.next_due_utc || 'none'}`);
   console.log('Weekly timesheet runtime configuration',JSON.stringify(weeklySchedule));
@@ -336,6 +338,7 @@ async function bootstrap() {
     stopWeeklyTimesheetScheduler();
     stopWorkflowSlaScheduler();
     await stopProcurementImportWorker();
+    await stopDeviceNoticeWorker();
     await getRateLimitService().close().catch(() => {});
     await pool.end().catch(() => {});
     const migrationContext = error?.details?.migration_id
@@ -354,6 +357,7 @@ async function shutdown(signal = 'shutdown', exitCode = 0) {
   stopWeeklyTimesheetScheduler();
   stopWorkflowSlaScheduler();
   await stopProcurementImportWorker();
+  await stopDeviceNoticeWorker();
   await getRateLimitService().close().catch(() => {});
   if (server?.listening) await new Promise((resolve) => server.close(resolve));
   await pool.end().catch(() => {});

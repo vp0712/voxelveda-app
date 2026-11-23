@@ -13,9 +13,19 @@ function selectClientInvoiceCompanyFolder(folder){
 async function clientJson(res){try{return await res.json()}catch{return {}}}
 
 async function loadClientIdentity(){
-  const res=await fetch('/api/auth/me',{credentials:'same-origin',cache:'no-store'});
-  if(!res.ok){window.location.replace('/login?message='+encodeURIComponent('Please login to open the client portal.'));return}
-  const data=await clientJson(res); vvClientUser=data.user||{};
+  let data;
+  try {
+    const res=await fetch('/api/auth/me',{credentials:'same-origin',cache:'no-store'});
+    if(res.status===401){window.location.replace('/login?returnTo='+encodeURIComponent(location.pathname+location.search+location.hash));return;}
+    data=await clientJson(res);
+    if(!res.ok || !data.user?.id)throw new Error('Account temporarily unavailable');
+  } catch {
+    clientStatus('Your account could not be loaded. Reconnect or reload the current page to retry.','error');
+    window.addEventListener('online',loadClientIdentity,{once:true});
+    return;
+  }
+  clientStatus('');
+  vvClientUser=data.user;
   const role=String(vvClientUser.role||'').toLowerCase();
   if(!['viewer','view_only','client','customer'].includes(role)){
     window.location.replace(role==='admin'||role==='super_admin'?'/admin':'/dashboard'); return;

@@ -1,0 +1,294 @@
+/* Shared entry, home and account surfaces. Sidebar and chart rules live in their retained stylesheets. */
+[data-vv-entry-surface] {
+  --vv-entry-gradient: linear-gradient(138deg, #08172f 8%, #17245a 58%, #362e84);
+  --vv-entry-on-navy: #f7f9ff;
+  --vv-entry-secondary-on-navy: #dae1fc;
+  --vv-entry-radius: 20px;
+  --vv-entry-shadow: 0 12px 30px rgb(14 26 62 / .09);
+}
+
+.login-page.vv-sign-in {
+  background: var(--vv-entry-gradient) fixed !important;
+}
+
+.login-page.vv-sign-in .login-shell {
+  padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    calc(24px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+.login-page.vv-sign-in .login-card {
+  display: grid;
+  grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr);
+  align-items: stretch;
+  width: min(100%, 960px);
+  max-width: 960px;
+  padding: 0 !important;
+  border: 1px solid rgb(163 180 238 / .55) !important;
+  border-radius: 26px !important;
+  isolation: isolate;
+  box-shadow: 0 22px 72px rgb(4 11 30 / .4);
+}
+
+.vv-entry-art {
+  position: relative;
+  min-width: 0;
+  min-height: 178px;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 25px 0 0 25px;
+  background: var(--vv-entry-gradient);
+}
+
+.vv-entry-illustration {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  animation: vvEntryArt .28s ease-out both;
+}
+
+.login-page.vv-sign-in .vv-entry-logo {
+  position: relative;
+  display: block;
+  width: clamp(54px, 14vw, 72px);
+  height: auto;
+  margin: 16px;
+  border: 1px solid rgb(210 220 255 / .45);
+  border-radius: 12px;
+  object-fit: contain;
+}
+
+.vv-entry-form {
+  min-width: 0;
+  padding: clamp(24px, 4vw, 48px);
+}
+
+.login-page.vv-sign-in .vv-entry-form h1 {
+  margin: 0 0 8px;
+  font-size: clamp(1.65rem, 4.5vw, 2.2rem) !important;
+  line-height: 1.16;
+  text-align: left;
+}
+
+.vv-entry-intro {
+  margin: 0 0 24px;
+  color: var(--text-secondary);
+  font-size: .9375rem;
+}
+
+.login-page.vv-sign-in .vv-entry-form .login-field {
+  margin-bottom: 14px;
+}
+
+.login-page.vv-sign-in .vv-entry-form input {
+  border-radius: 12px !important;
+  font-size: 1rem;
+}
+
+.vv-entry-recovery {
+  display: flex;
+  justify-content: flex-end;
+  margin: -4px 0 2px;
+}
+
+.vv-entry-recovery a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--primary);
+  font-size: .875rem;
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+.login-page.vv-sign-in .login-btn {
+  min-height: 48px;
+  margin-top: 2px;
+  border-radius: 12px !important;
+}
+
+.login-page.vv-sign-in .login-register-prompt {
+  margin: 13px 0 6px;
+}
+
+.login-page.vv-sign-in .login-register-prompt a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+}
+
+.vv-sign-in [data-device-notices-entry]:not(:empty) {
+  margin-block: 8px 4px;
+}
+
+.login-page.vv-sign-in .login-footer-links {
+  margin-top: 12px;
+}
+
+/* The greeting is outside the unchanged chart grid, scales and click targets. */
+body[data-vv-entry-surface] .vv-workspace-hero {
+  padding: clamp(18px, 3vw, 28px);
+  border: 1px solid #48518c;
+  border-radius: var(--vv-entry-radius);
+  background: var(--vv-entry-gradient) !important;
+  color: var(--vv-entry-on-navy) !important;
+  box-shadow: var(--vv-entry-shadow);
+  overflow-wrap: anywhere;
+}
+
+body[data-vv-entry-surface] .vv-workspace-hero :is(h1,h2,.staff-role-pill) {
+  color: var(--vv-entry-on-navy) !important;
+}
+
+body[data-vv-entry-surface] .vv-workspace-hero :is(p,.eyebrow) {
+  color: var(--vv-entry-secondary-on-navy) !important;
+}
+
+body[data-vv-entry-surface="admin"] .admin-home-heading.vv-workspace-hero {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 2vw, 18px);
+}
+
+.vv-workspace-mark {
+  display: block;
+  flex: 0 0 auto;
+  width: clamp(44px, 10vw, 58px);
+  height: auto;
+  align-self: flex-start;
+  border: 1px solid rgb(210 220 255 / .4);
+  border-radius: 11px;
+}
+
+body[data-vv-entry-surface="admin"] .admin-home-heading h1 {
+  margin: 0 0 5px;
+}
+
+body[data-vv-entry-surface="admin"] .admin-home-heading p {
+  margin: 0;
+}
+
+body[data-vv-entry-surface] :is(.admin-home-actions,.staff-role-actions) button,
+body[data-vv-entry-surface="staff"] :is(.staff-home-shift-actions,.staff-role-actions) :is(.primary-btn,.secondary-btn) {
+  border-radius: 12px !important;
+}
+
+body[data-vv-entry-surface="staff"] :is(.staff-home-card,.staff-home-attendance,.staff-role-work,.staff-profile-shell .profile-block),
+body[data-vv-entry-surface="client"] :is(.client-card,.client-action),
+body[data-vv-entry-surface="profile"] .vv-profile-surface .card {
+  border-radius: var(--vv-entry-radius);
+  box-shadow: var(--vv-entry-shadow);
+}
+
+.staff-home-greeting.vv-workspace-hero .staff-icon-button {
+  background: rgb(255 255 255 / .1);
+  border-color: #b4c4fa;
+  color: var(--vv-entry-on-navy);
+}
+
+.staff-home-greeting.vv-workspace-hero .staff-icon-button:hover {
+  background: rgb(255 255 255 / .2);
+}
+
+body[data-vv-entry-surface="staff"] .staff-profile-hero.vv-workspace-hero .staff-role-pill {
+  border: 1px solid #b4c4fa;
+  background: rgb(255 255 255 / .1);
+}
+
+body[data-vv-entry-surface="client"].hub-companion-shell .client-hero.vv-workspace-hero {
+  border-color: #48518c;
+  border-radius: var(--vv-entry-radius);
+  background: var(--vv-entry-gradient) !important;
+  box-shadow: var(--vv-entry-shadow);
+}
+
+body[data-vv-entry-surface="client"].hub-companion-shell .client-hero.vv-workspace-hero :is(h2,p,.eyebrow) {
+  color: var(--vv-entry-on-navy) !important;
+}
+
+body[data-vv-entry-surface="client"] .client-action {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.vv-profile-surface .grid {
+  align-items: start;
+}
+
+.vv-profile-surface .photoCard {
+  background: linear-gradient(180deg, var(--surface-muted), var(--surface) 190px);
+}
+
+.vv-profile-surface :is(h1,h2,.brand,.account-status,.meta strong,.roleBadge,.helper,.profile-row) {
+  overflow-wrap: anywhere;
+}
+
+.vv-profile-surface .completionTrack i {
+  background: var(--primary);
+}
+
+.vv-profile-surface [data-device-notices-settings]:not(:empty) {
+  margin-top: 18px;
+}
+
+@media (max-width: 680px) {
+  .login-page.vv-sign-in .login-shell {
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .login-page.vv-sign-in .login-card {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 440px;
+    border-radius: 22px !important;
+  }
+
+  .vv-entry-art {
+    min-height: clamp(136px, 40vw, 210px);
+    border-radius: 21px 21px 0 0;
+  }
+
+  .vv-entry-illustration {
+    object-position: 50% 48%;
+  }
+
+  .vv-entry-form {
+    padding: 21px clamp(16px, 5vw, 26px) 14px;
+  }
+
+  .vv-entry-intro {
+    margin-bottom: 16px;
+  }
+
+  body[data-vv-entry-surface="staff"] .staff-home-greeting.vv-workspace-hero {
+    gap: 10px;
+  }
+
+  body[data-vv-entry-surface] .mobile-bottom-nav button {
+    border-radius: 10px !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .login-page.vv-sign-in .login-shell {
+    padding-inline: max(10px, env(safe-area-inset-left)) max(10px, env(safe-area-inset-right));
+  }
+
+  .vv-entry-form {
+    padding-inline: 16px;
+  }
+}
+
+@keyframes vvEntryArt {
+  from { opacity: .48; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vv-entry-illustration {
+    animation: none;
+  }
+}

@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>Voxel Veda Operations</title>
+  <link rel="stylesheet" href="/app-entry-design.css">
 <link rel="stylesheet" href="/original-layout.css?v=20261011-restored">
 <link rel="stylesheet" href="/expense-payments.css?v=20260904"/>
 <link rel="stylesheet" href="/step-up.css?v=20260905"/>
@@ -23,7 +24,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:image" content="https://app.voxelveda.com/og-image.png?v=20260703-brand" /><link rel="stylesheet" href="/workspace-theme.css?v=20261011-restored"><link rel="stylesheet" href="/operations-theme.css?v=20261013-procurement-pdf"><script src="/workspace-theme.js?v=20261011-restored"></script><script src="/operations-ui.js?v=20261011-restored"></script><link rel="stylesheet" href="/compact-header.css?v=20261013-staff-mobile"><link rel="stylesheet" href="/notification-center.css?v=20261013-staff-mobile"><script src="/workspace-overlays.js?v=20261013-staff-mobile"></script><link rel="stylesheet" href="/attendance-gate.css"><link rel="stylesheet" href="/admin-home.css"><link rel="stylesheet" href="/weekly-delivery.css"><link rel="stylesheet" href="/invoice-folders.css"><script src="/invoice-folders.js"></script></head>
 
-<body>
+<body data-vv-entry-surface="admin">
   <div class="mobile-sidebar-backdrop" data-mobile-menu-action="close" aria-hidden="true"></div>
 
   <div class="app-shell">
@@ -134,7 +135,10 @@
 
       <!-- OVERVIEW -->
       <section id="dashboardSection" class="page-section">
-        <div class="admin-home-heading"><p class="panel-kicker">Voxel Veda</p><h1>Operations home</h1><p>Review today’s work, attendance and business records.</p></div>
+        <div class="admin-home-heading vv-workspace-hero">
+          <img class="vv-workspace-mark" src="/logo.png" alt="Voxel Veda" width="58" height="58">
+          <div><h1>Operations home</h1><p>Review today’s work, attendance and business records.</p></div>
+        </div>
         <div class="admin-home-actions">
           <button class="secondary-btn" data-permission="attendance" onclick="goSection('attendanceSection')">Attendance & exceptions</button>
           <button class="secondary-btn" data-permission="approvals" onclick="goSection('approvalsSection')">Approvals</button>
@@ -1384,6 +1388,7 @@
 
       <!-- SETTINGS -->
       <section id="settingsSection" class="page-section hidden-section">
+        <div data-device-notices-settings></div>
         <div class="section-head">
           <div>
             <h2>System Settings</h2>

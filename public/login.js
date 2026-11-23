@@ -1,21 +1,24 @@
 async function redirectSavedSession() {
-  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
   try {
-    const res = await fetch('/api/auth/me', { credentials: 'same-origin',signal:controller.signal });
-    if (!res.ok) throw new Error('Saved session is no longer valid');
-    const data = await res.json();
-    const savedUser = data.user || {};
+    const res = await fetch('/api/auth/me', { credentials: 'same-origin', cache: 'no-store', signal: controller.signal });
+    if (res.status === 401) {
+      ['token', 'user', 'role'].forEach((key) => localStorage.removeItem(key));
+      return 'anonymous';
+    }
+    const data = await readResponse(res);
+    if (res.status === 403 && data.code === 'MFA_REQUIRED') return 'verification-required';
+    if (!res.ok || !data.user?.id) return 'unavailable';
+    const savedUser = data.user;
     const role = String(savedUser.role || '').toLowerCase();
     localStorage.removeItem('token');
     localStorage.setItem('user', JSON.stringify(savedUser));
     localStorage.setItem('role', role);
     window.location.replace(safeReturnTo(role, savedUser));
-    return true;
+    return 'redirected';
   } catch {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('role');
-    return false;
+    return 'unavailable';
   } finally { clearTimeout(timeout); }
 }
 
@@ -67,10 +70,16 @@ function portalPathForUser(role, user = {}) {
 function safeReturnTo(role, user = {}) {
   const home = portalPathForUser(role, user);
   const value = new URLSearchParams(window.location.search).get('returnTo');
-  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return home;
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\') || /[\u0000-\u001f\u007f]/.test(value)) return home;
   // The server checks access for every restored protected destination.
   const path = value.split(/[?#]/, 1)[0];
-  const allowed=['/dashboard','/security','/profile','/admin','/client','/account','/quality','/shop-floor','/attendance-terminal','/a','/attendance/scan','/invoice/view','/document/view'];
+  const allowed = [
+    '/dashboard', '/security', '/profile', '/admin', '/client', '/account', '/quality', '/shop-floor',
+    '/attendance-terminal', '/a', '/attendance/scan', '/invoice/view', '/document/view', '/employee-id',
+    '/careers-admin', '/rfqs', '/quotations', '/invoices', '/customers', '/suppliers', '/procurement',
+    '/stock', '/inventory', '/raw-material', '/packaging', '/expenses', '/workforce', '/timesheets',
+    '/roster', '/staff', '/compliance', '/forms', '/settings', '/meetings', '/tasks', '/trash', '/approvals'
+  ];
   return allowed.includes(path) || /^\/portal\/(staff|manager|supervisor|hr|production|sales)$/.test(path) ? value : home;
 }
 
@@ -106,7 +115,7 @@ async function login() {
       signal:controller.signal,
       method: 'POST',
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...window.VVDeviceNotices?.headers?.() },
       body: JSON.stringify({ email, password })
     });
 
@@ -166,7 +175,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   const params = new URLSearchParams(window.location.search);
   const explicitMessage = params.get('message');
-  if (!explicitMessage && await redirectSavedSession()) return;
+  if (!explicitMessage) {
+    const outcome = await redirectSavedSession();
+    if (outcome === 'redirected') return;
+    if (outcome === 'unavailable') {
+      setLoginStatus('Saved sign-in could not be checked. Reconnect to restore your session.', 'warning');
+      window.addEventListener('online', () => {
+        if (!loginInFlight && !document.getElementById('email')?.value && !document.getElementById('password')?.value) {
+          redirectSavedSession();
+        }
+      }, { once: true });
+    }
+  }
   showLoginMessageFromUrl();
   setLoginBusy(false);
 });

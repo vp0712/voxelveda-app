@@ -79,6 +79,7 @@ async function run() {
     '../services/sessionService': {},
     '../services/passwordPolicy': { validatePassword },
     '../services/authSessionService': {},
+    '../services/deviceNoticeService': {},
     '../services/mfaService': {}
   });
 

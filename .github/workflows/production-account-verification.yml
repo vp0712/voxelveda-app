@@ -78,3 +78,9 @@ jobs:
           name: production-proof-${{ github.sha }}
           path: ${{ runner.temp }}/production-proof
           retention-days: 30
+      - name: Record the verified production rollout for opted-in installations
+        if: github.ref_name == 'main' && success()
+        env:
+          DEVICE_RELEASE_WEBHOOK_SECRET: ${{ secrets.DEVICE_RELEASE_WEBHOOK_SECRET }}
+          VV_VERIFIED_RELEASE_SHA: ${{ needs.release-selection.outputs.expected_commit }}
+        run: node scripts/publish-device-release-notice.js web "$VV_VERIFIED_RELEASE_SHA"

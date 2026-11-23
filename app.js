@@ -50,8 +50,10 @@ function sendPage(filename,status=200){return(req,res)=>{
  return res.status(status).type('html').send(html);
 }}
 function redirect(target){return(req,res)=>{const index=req.originalUrl.indexOf('?');return res.redirect(302,target+(index>=0?req.originalUrl.slice(index):''));}}
-app.get('/',sendPage('index.html'));
-app.get('/login',noIndex,sendPage('login.html'));
+const signInEntry=pageAuth({signInEntry:true});
+app.get('/',signInEntry,sendPage('index.html'));
+app.get('/login',noIndex,signInEntry,sendPage('login.html'));
+app.get('/updates',noIndex,sendPage('updates.html'));
 app.get('/register',noIndex,sendPage('register.html'));
 app.get('/privacy',sendPage('privacy-policy.html'));
 app.get('/terms',sendPage('terms.html'));
@@ -68,7 +70,7 @@ function portalPath(user){
  if(['super_admin','admin','finance_admin','finance_user','accountant'].includes(role))return '/admin';
  return '/portal/'+(['hr','manager','supervisor','sales','production','staff'].includes(role)?role:'staff');
 }
-app.get('/dashboard',noIndex,pageAuth(),(req,res)=>res.redirect(302,portalPath(req.user)));
+app.get('/dashboard',noIndex,pageAuth(),(req,res)=>res.redirect(302,portalPath(req.user)+(req.query.team_activity==='1'?'?team_activity=1':'')));
 app.get('/profile',noIndex,pageAuth(),sendPage('profile.html'));
 app.get('/document/view',noIndex,pageAuth(),sendPage('document-view.html'));
 app.get('/account',noIndex,pageAuth(),sendPage('workspace.html'));
@@ -118,6 +120,11 @@ app.use((req,res,next)=>{
 const apiRateLimit=rateLimitPolicy('authenticated_api');
 app.use((req,res,next)=>req.path.startsWith('/api/')?apiRateLimit(req,res,next):next());
 app.use('/api/auth',authRoutes);
+app.use('/api/device-notices', require('./routes/deviceNoticeRoutes'));
+const aiTeam = require('./routes/aiTeamRoutes');
+app.post('/api/ai-team/github', aiTeam.webhook);
+app.post('/api/ai-team/runner', aiTeam.runner);
+app.use('/api/ai-team', auth, aiTeam.feed);
 app.use('/api/users',auth,userRoutes);
 app.use('/api/profile',auth,profileRoutes);
 app.use('/api/settings',auth,settingsRoutes);

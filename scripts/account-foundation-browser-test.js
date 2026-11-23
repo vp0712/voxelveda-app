@@ -10,6 +10,9 @@ const app=express();app.use(express.json());
 app.get('/api/auth/me',(req,res)=>res.json({user:{id:1,name:'Ana Fixture',email:'ana@example.invalid',role:'viewer'}}));
 app.get('/api/profile',(req,res)=>res.json({profile:{id:1,name:'Ana Fixture',email:'ana@example.invalid',username:'ana.fixture',role:'viewer',active:true,account_status:'ACTIVE',has_profile_photo:false,profile_photo_url:null,profile_photo_revision:null,mobile_number:null,timesheet_delivery_email:null}}));
 app.get('/api/notifications/preferences',(req,res)=>res.json({preferences:[]}));
+app.get('/api/device-notices/configuration',(_req,res)=>res.json({push_available:false,latest_release:null}));
+app.get('/api/device-notices/installation',(_req,res)=>res.json({registered:false,release_opt_in:false}));
+app.post('/api/device-notices/installation/account',(_req,res)=>res.json({eligible:false,registered:false}));
 app.get('/api/auth/mfa/status',(req,res)=>res.json({enabled:false,required:false,recovery_codes_remaining:0,assurance_level:1}));
 app.get('/api/auth/sessions',(req,res)=>res.json({sessions:[{id:1,current:true,user_agent:'Local browser fixture',last_seen_at:'2026-10-09T12:00:00Z'}]}));
 app.post('/api/auth/logout',(req,res)=>res.json({message:'Signed out'}));
@@ -36,6 +39,7 @@ app.use(express.static(path.join(project,'public')));
    await inspectLayout('account');await page.screenshot({path:path.join(out,'local-account-'+view.name+'.png'),fullPage:true});
    await page.getByRole('link',{name:'Manage your profile'}).click();await page.waitForURL('**/profile');
    await page.waitForFunction(()=>document.querySelector('#displayName').textContent==='Ana Fixture');
+   await page.getByRole('heading',{name:'Device notifications',exact:true}).waitFor();
    assert.equal(await page.locator('#department,#employeeNumber').count(),0,'profile does not expose ERP employment fields');
    await inspectLayout('profile');
    if(view.name==='phone'||view.name==='desktop')await page.screenshot({path:path.join(out,'local-profile-'+view.name+'.png'),fullPage:true});
@@ -51,7 +55,9 @@ app.use(express.static(path.join(project,'public')));
    }
    assert.deepEqual(errors,[]);
    assert.deepEqual(assetFailures,[],'All retained scripts, styles, images and fonts load successfully');
-   assert.ok(apiCalls.every(api=>['/api/auth/me','/api/profile','/api/auth/mfa/status','/api/auth/sessions','/api/notifications/preferences'].includes(api)),'Only retained account and personal notification-settings APIs are called');
+   assert.ok(apiCalls.every(api=>['/api/auth/me','/api/profile','/api/auth/mfa/status','/api/auth/sessions','/api/notifications/preferences',
+    '/api/device-notices/configuration','/api/device-notices/installation','/api/device-notices/installation/account'].includes(api)),
+    'Only retained account and own notification-settings APIs are called');
    const publicLayouts=[];
    await page.route('**/api/auth/me',route=>route.fulfill({status:401,contentType:'application/json',body:'{"message":"Login required"}'}));
    for(const theme of ['light','dark'])for(const route of ['/','/login','/register','/forgot-password','/reset-password']){
