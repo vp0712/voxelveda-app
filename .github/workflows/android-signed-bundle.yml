@@ -45,7 +45,76 @@ concurrency:
   group: existing-identity-android-release
   cancel-in-progress: false
 jobs:
+  prepare-replacement-upload-key:
+    if: github.repository == 'vp0712/voxelveda-app' && github.ref == 'refs/heads/ops/android-upload-key-reset-20261124' && inputs.play_intent == 'artifact-only'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Preserve the replacement upload key in repository secrets
+        env:
+          GH_TOKEN: ${{ secrets.ANDROID_UPLOAD_KEY_SETUP_TOKEN }}
+          STAGED_UPLOAD_KEY: ${{ secrets.ANDROID_UPLOAD_KEY_SETUP_BACKUP }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo '::error::The repository-scoped ANDROID_UPLOAD_KEY_SETUP_TOKEN is required.'
+            exit 1
+          fi
+          gh api --silent "repos/$GITHUB_REPOSITORY/actions/secrets/public-key"
+          secret_names=$(gh secret list --repo "$GITHUB_REPOSITORY" --json name --jq '.[].name')
+          grep -qx ANDROID_GOOGLE_SERVICES_JSON <<< "$secret_names"
+          key_dir=$(mktemp -d "$RUNNER_TEMP/voxel-upload-key.XXXXXX")
+          trap 'rm -rf "$key_dir"' EXIT
+          if [[ -z "$STAGED_UPLOAD_KEY" ]]; then
+            if grep -Eq '^(ANDROID_UPLOAD_KEYSTORE_BASE64|ANDROID_KEYSTORE_PASSWORD|ANDROID_KEY_ALIAS|ANDROID_KEY_PASSWORD|ANDROID_UPLOAD_KEY_SETUP_BACKUP)$' <<< "$secret_names"; then
+              echo '::error::Existing upload-key secrets require review before creating a replacement.'
+              exit 1
+            fi
+            openssl rand -hex 32 > "$key_dir/password"
+            keytool -genkeypair -alias upload -storetype PKCS12 -keyalg RSA -keysize 3072 -sigalg SHA256withRSA -validity 10000 \
+              -dname 'CN=Voxel Veda Android Upload, O=Voxel Veda Pty Ltd, C=AU' \
+              -keystore "$key_dir/upload.p12" -storepass:file "$key_dir/password" -keypass:file "$key_dir/password"
+            base64 -w0 "$key_dir/upload.p12" > "$key_dir/keystore.base64"
+            jq -n --rawfile keystore "$key_dir/keystore.base64" --rawfile password "$key_dir/password" \
+              '{keystore: $keystore, password: ($password | rtrimstr("\n"))}' > "$key_dir/backup.json"
+            gh secret set ANDROID_UPLOAD_KEY_SETUP_BACKUP --repo "$GITHUB_REPOSITORY" < "$key_dir/backup.json"
+          else
+            # A retry can complete interrupted writes using the preserved key.
+            printf '%s' "$STAGED_UPLOAD_KEY" > "$key_dir/backup.json"
+            jq -er '.keystore' "$key_dir/backup.json" > "$key_dir/keystore.base64"
+            jq -er '.password' "$key_dir/backup.json" > "$key_dir/password"
+            base64 --decode "$key_dir/keystore.base64" > "$key_dir/upload.p12"
+          fi
+          install -d -m 700 "$RUNNER_TEMP/upload-key-certificate"
+          keytool -exportcert -rfc -alias upload -storetype PKCS12 \
+            -keystore "$key_dir/upload.p12" -storepass:file "$key_dir/password" \
+            -file "$RUNNER_TEMP/upload-key-certificate/upload_certificate.pem"
+          jq -erj '.keystore' "$key_dir/backup.json" | gh secret set ANDROID_UPLOAD_KEYSTORE_BASE64 --repo "$GITHUB_REPOSITORY"
+          jq -erj '.password' "$key_dir/backup.json" | gh secret set ANDROID_KEYSTORE_PASSWORD --repo "$GITHUB_REPOSITORY"
+          printf '%s' upload | gh secret set ANDROID_KEY_ALIAS --repo "$GITHUB_REPOSITORY"
+          jq -erj '.password' "$key_dir/backup.json" | gh secret set ANDROID_KEY_PASSWORD --repo "$GITHUB_REPOSITORY"
+          secret_names=$(gh secret list --repo "$GITHUB_REPOSITORY" --json name --jq '.[].name')
+          for name in ANDROID_UPLOAD_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD ANDROID_UPLOAD_KEY_SETUP_BACKUP; do
+            grep -qx "$name" <<< "$secret_names"
+          done
+          openssl x509 -in "$RUNNER_TEMP/upload-key-certificate/upload_certificate.pem" -noout -fingerprint -sha256
+      - name: Preserve the public upload certificate
+        uses: actions/upload-artifact@v4
+        with:
+          name: voxel-veda-upload-certificate
+          path: ${{ runner.temp }}/upload-key-certificate/upload_certificate.pem
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove the one-time repository token binding
+        env:
+          GH_TOKEN: ${{ secrets.ANDROID_UPLOAD_KEY_SETUP_TOKEN }}
+        run: gh secret delete ANDROID_UPLOAD_KEY_SETUP_TOKEN --repo "$GITHUB_REPOSITORY"
   signed-bundle:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
