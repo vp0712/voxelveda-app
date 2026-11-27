@@ -22,7 +22,7 @@
       try{decoder=await window.getShiftQrDecoder();}
       catch(error){if(error?.code==='QR_DECODER_LOAD_FAILED')throw error;if(typeof window.jsQR!=='function')await window.loadExternalScript('/vendor/jsQR.js');if(typeof window.jsQR!=='function')throw error;decoder={type:'canvas'};}
       if(run!==generation)return;
-      onStatus('Position the current workplace QR code inside the frame. Scanning does not change your attendance.');
+      onStatus('Position the Voxel Veda attendance QR code inside the frame. Scanning does not change your attendance.');
       const scan=async()=>{
         if(run!==generation)return;
         try{

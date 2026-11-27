@@ -168,14 +168,26 @@
     $('staffAttendanceBody').querySelector('[aria-invalid="true"]')?.focus();
   }
   function button(id,label,className='primary-btn'){return `<button type="button" id="${id}" class="${className}">${escape(label)}</button>`;}
+  const publicAttendanceUrl = 'https://qr.voxelveda.com/remote';
+  const isPublicAttendanceQr = value => /^https:\/\/qr\.voxelveda\.com\/remote(?:\?v=[0-9]{1,12})?$/.test(value);
   async function startCamera(action,retainedRequest=null){
-    const lease=account();openSheet(actionLabels[action],`<p class="staff-sheet-subtitle">Scan the current workplace QR. You will review and confirm ${escape(actionLabels[action].toLowerCase())} before anything is saved.</p><div class="staff-scanner-camera"><video id="staffAttendanceVideo" muted autoplay playsinline></video><span class="staff-scanner-frame" aria-hidden="true"></span></div><p id="staffAttendanceScanStatus" class="staff-scanner-status" role="status">Preparing camera...</p><div class="staff-sheet-actions">${button('staffAttendanceCameraRetry','Retry camera','secondary-btn')}${button('staffAttendanceScanCancel','Cancel','secondary-btn')}</div>`,'scan');
+    const lease=account();openSheet(actionLabels[action],`<p class="staff-sheet-subtitle">Scan a Voxel Veda attendance QR. You will review and confirm ${escape(actionLabels[action].toLowerCase())} before anything is saved.</p><div class="staff-scanner-camera"><video id="staffAttendanceVideo" muted autoplay playsinline></video><span class="staff-scanner-frame" aria-hidden="true"></span></div><p id="staffAttendanceScanStatus" class="staff-scanner-status" role="status">Preparing camera...</p><div class="staff-sheet-actions">${button('staffAttendanceCameraRetry','Retry camera','secondary-btn')}${button('staffAttendanceScanCancel','Cancel','secondary-btn')}</div>`,'scan');
     $('staffAttendanceCameraRetry').onclick=()=>startCamera(action,retainedRequest);$('staffAttendanceScanCancel').onclick=close;
     if(window.VoxelNativeApp){const settings=document.createElement('button');settings.type='button';settings.className='secondary-btn';settings.textContent='App camera settings';settings.onclick=()=>window.VoxelNativeApp.openCameraSettings().catch(()=>setText('staffAttendanceScanStatus','Open Android Settings, choose Voxel Veda, and allow camera access.'));$('staffAttendanceCameraRetry').after(settings);}
     await window.VoxelAttendanceScanner.start({video:$('staffAttendanceVideo'),onStatus:message=>{if(current(lease)&&overlayKind==='scan')setText('staffAttendanceScanStatus',message);},onError:message=>{if(!current(lease)||overlayKind!=='scan')return;setText('staffAttendanceScanStatus',message);$('staffAttendanceScanStatus')?.setAttribute('data-error','true');},onToken:token=>current(lease)&&overlayKind==='scan'?verifyQr(action,token,retainedRequest):undefined});
   }
   async function verifyQr(action,raw,retainedRequest=null){
     const lease=account();const token=String(raw||'').trim();
+    if(isPublicAttendanceQr(token)){
+      if(retainedRequest||pending){
+        setText('staffAttendanceScanStatus','Finish checking the existing attendance request in the app before opening the public QR.');
+        $('staffAttendanceScanStatus')?.setAttribute('data-error','true');
+        return;
+      }
+      openSheet('Public attendance QR',`<p class="staff-sheet-subtitle">Open the secure attendance page in your browser, then confirm your check-in or checkout on your linked phone.</p><div class="staff-sheet-actions"><a id="staffAttendancePublicQrOpen" class="primary-btn staff-attendance-browser-link" href="${publicAttendanceUrl}">Open attendance</a>${button('staffAttendancePublicQrCancel','Cancel','secondary-btn')}</div>`,'public-qr');
+      $('staffAttendancePublicQrCancel').onclick=close;
+      return;
+    }
     if(!token||token.length>2000){setText('staffAttendanceScanStatus','This is not a valid attendance QR. Scan the current workplace code. No attendance was changed.');$('staffAttendanceScanStatus')?.setAttribute('data-error','true');return;}
     setText('staffAttendanceScanStatus','Checking the QR and your current attendance...');
     const refreshed=await refresh();if(!current(lease))return;if(!refreshed||!allowed(action)){sheetError('Your shift state changed. Close this scanner and review the current attendance before trying again.');return;}

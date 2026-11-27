@@ -288,12 +288,20 @@ async function verifyEmulatedCameraCases(browser, fixture) {
   // capture and decoded-token input are emulated; native camera/QR recognition
   // is not claimed. Signature, expiry and site responses use the real service.
   const qr = require('../services/attendanceQrService'), results = [];
+  const publicTarget = 'https://qr.voxelveda.com/remote';
+  const lookalikeTarget = 'https://qr.voxelveda.com.example.invalid/remote?v=123';
+  const pendingRequest = { request_id: 'f2ce123f-b725-47b9-ae86-eebfca5ccc68', action: 'CHECK_IN', attendance_id: null, user_id: 9402 };
   const scenarios = [
     { name: 'permission-denied', mode: 'denied', message: 'Camera permission was denied', calls: 1 },
     { name: 'camera-not-found', mode: 'unavailable', message: 'No camera is available', calls: 2 },
     { name: 'media-api-unavailable', mode: 'unsupported', message: 'Camera scanning is unavailable', calls: 0 },
     { name: 'decoder-unavailable', mode: 'decoder-unavailable', message: 'camera or QR decoder is unavailable', calls: 1, tracks: 1 },
     { name: 'allowed-camera-close', mode: 'no-token', calls: 1, tracks: 1 },
+    { name: 'public-attendance-link-cancelled', mode: 'token', token: () => publicTarget, calls: 1, tracks: 1, publicHandoff: true },
+    { name: 'versioned-public-attendance-link-opened', mode: 'token', token: () => publicTarget + '?v=123', calls: 1, tracks: 1, publicHandoff: true, openLink: true },
+    { name: 'invalid-public-attendance-host', mode: 'token', token: () => lookalikeTarget, calls: 1, tracks: 1, untrusted: true },
+    { name: 'invalid-public-attendance-query', mode: 'token', token: () => publicTarget + '?v=123&redirect=other', calls: 1, tracks: 1, untrusted: true },
+    { name: 'retained-request-stays-in-scanner', mode: 'token', token: () => publicTarget + '?v=123', calls: 1, tracks: 1, retained: true },
     { name: 'allowed-valid-signed-token', mode: 'token', token: () => qr.createSiteToken(new Date()).qr_data, calls: 1, tracks: 1, valid: true },
     { name: 'invalid-signed-token', mode: 'token', token: () => 'synthetic-invalid-signed-token', calls: 1, tracks: 1, code: 'ATTENDANCE_QR_INVALID' },
     { name: 'expired-signed-token', mode: 'token', token: () => qr.createSiteToken(new Date(Date.now() - 120000)).qr_data, calls: 1, tracks: 1, code: 'ATTENDANCE_QR_EXPIRED' },
@@ -309,6 +317,12 @@ async function verifyEmulatedCameraCases(browser, fixture) {
     const context = await browser.newContext({ viewport: { width: 375, height: 812 }, reducedMotion: 'reduce' });
     context.setDefaultTimeout(12000);
     await context.addCookies([{ name: 'vv_session', value: userSession(9402), url: fixture.origin, httpOnly: true, sameSite: 'Lax' }]);
+    if (scenario.retained) await context.addInitScript(request => sessionStorage.setItem('voxelveda:attendance-pending', JSON.stringify(request)), pendingRequest);
+    const publicRequests = [];
+    await context.route(url => ['qr.voxelveda.com', 'qr.voxelveda.com.example.invalid'].includes(url.hostname), async route => {
+      publicRequests.push(route.request().url());
+      await route.fulfill({ contentType: 'text/plain', body: 'Synthetic attendance handoff destination' });
+    });
     const page = await context.newPage(), errors = [], qrResponses = [], reads = [];
     page.on('pageerror', error => errors.push(error.message));
     page.on('response', response => {
@@ -346,9 +360,22 @@ async function verifyEmulatedCameraCases(browser, fixture) {
       }, { mode: scenario.mode, decodedToken: scenario.token?.() || null });
       assert.equal(fixture.state.receiptRequests.length, 0);
       await page.locator('#staffHomePrimaryAction').click();
+      if (scenario.retained) await page.locator('#staffAttendanceRetryOriginal').click();
       await page.locator('#staffAttendanceOverlay').waitFor({ state: 'visible' });
+      const publicLink = page.locator('#staffAttendancePublicQrOpen');
       if (scenario.message) await page.locator('#staffAttendanceScanStatus').filter({ hasText: scenario.message }).waitFor();
       else if (scenario.valid) await page.locator('#staffAttendanceConfirm').waitFor();
+      else if (scenario.publicHandoff) {
+        await publicLink.waitFor();
+        assert.equal(await publicLink.evaluate(element => element.tagName), 'A');
+        assert.equal(await publicLink.getAttribute('href'), publicTarget);
+        assert.equal(new URL(page.url()).origin, fixture.origin);
+        assert.equal(fixture.state.qrValidationRequests.length, 0);
+      }
+      else if (scenario.untrusted || scenario.retained) {
+        await page.locator('#staffAttendanceScanStatus[data-error="true"], #staffAttendanceError').waitFor();
+        assert.equal(await publicLink.count(), 0);
+      }
       else if (scenario.code) {
         await page.waitForFunction(() => document.getElementById('staffAttendanceScanStatus')?.getAttribute('data-error') === 'true');
         const message = await page.locator('#staffAttendanceScanStatus').textContent();
@@ -359,22 +386,37 @@ async function verifyEmulatedCameraCases(browser, fixture) {
       }
       else if (scenario.mode === 'late') await page.waitForFunction(() => window.__emulatedAttendanceCamera?.calls === 1);
       else await page.waitForFunction(() => document.getElementById('staffAttendanceVideo')?.readyState >= 2 && window.__emulatedAttendanceCamera?.decoded > 0);
+      assert.deepEqual(publicRequests, [], 'Scanning must leave navigation to the staff member.');
       assert.equal(fixture.state.receiptRequests.length, 0, 'Opening camera, decoding and QR verification cannot clock a user in.');
       if (!scenario.valid) assert.equal(await page.locator('#staffAttendanceConfirm').count(), 0, 'A failed or unfinished scan cannot enable confirmation.');
-      if (scenario.valid) await page.locator('#staffAttendanceCancel').click();
+      const readDevice = () => page.evaluate(() => {
+        const camera = window.__emulatedAttendanceCamera;
+        return { calls: camera.calls, stopped: camera.stops, tracks: camera.tracks.length, states: camera.tracks.map(track => track.readyState) };
+      });
+      let device;
+      if (scenario.openLink) {
+        await page.waitForFunction(() => window.__emulatedAttendanceCamera.tracks.every(track => track.readyState === 'ended'));
+        device = await readDevice();
+        await Promise.all([page.waitForURL(publicTarget), publicLink.click()]);
+        assert.deepEqual(publicRequests, [publicTarget]);
+      } else if (scenario.publicHandoff) {
+        await page.locator('#staffAttendanceOverlay').getByRole('button', { name: 'Cancel', exact: true }).click();
+      } else if (scenario.valid) await page.locator('#staffAttendanceCancel').click();
       else await page.locator('#staffAttendanceScanCancel').click();
       if (scenario.mode === 'late') await page.evaluate(() => window.__emulatedAttendanceCamera.release());
       await page.locator('#staffAttendanceOverlay').waitFor({ state: 'hidden' });
-      if (scenario.tracks) await page.waitForFunction(() => window.__emulatedAttendanceCamera.tracks.every(track => track.readyState === 'ended'));
-      const device = await page.evaluate(() => ({ calls: window.__emulatedAttendanceCamera.calls, stopped: window.__emulatedAttendanceCamera.stops, tracks: window.__emulatedAttendanceCamera.tracks.length, states: window.__emulatedAttendanceCamera.tracks.map(track => track.readyState) }));
+      if (scenario.tracks && !scenario.openLink) await page.waitForFunction(() => window.__emulatedAttendanceCamera.tracks.every(track => track.readyState === 'ended'));
+      device ??= await readDevice();
       assert.equal(device.calls, scenario.calls); assert.equal(device.tracks, scenario.tracks || 0); assert.equal(device.stopped, scenario.tracks || 0);
       await Promise.all(reads);
       if (scenario.code) { assert.equal(qrResponses.length, 1); assert.equal(qrResponses[0].code, scenario.code); assert.equal(qrResponses[0].status, 403); }
       else if (scenario.valid) { assert.deepEqual(qrResponses, [{ status: 200, code: null, valid: true }]); }
+      else if (scenario.untrusted) assert(qrResponses.every(response => !response.valid && response.status >= 400));
       else assert.deepEqual(qrResponses, []);
+      if (scenario.publicHandoff || scenario.retained) assert.equal(fixture.state.qrValidationRequests.length, 0);
       assert.equal(fixture.state.receiptRequests.length, 0); assert.equal(fixture.state.attendance, null);
       assert.deepEqual(errors, []);
-      results.push({ scenario: scenario.name, hardwareEmulated: true, nativeHardwareVerified: false, device, qrResponses, actionsPosted: 0 });
+      results.push({ scenario: scenario.name, hardwareEmulated: true, nativeHardwareVerified: false, device, qrResponses, publicRequests, actionsPosted: 0 });
     } catch (error) {
       await page.screenshot({ path: path.join(output, 'scanner-' + scenario.name + '-failure.png'), fullPage: true, animations: 'disabled' }).catch(() => {});
       throw new Error('Emulated camera scenario failed: ' + scenario.name, { cause: error });

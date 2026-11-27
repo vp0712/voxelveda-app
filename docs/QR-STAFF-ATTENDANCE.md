@@ -14,7 +14,7 @@ To return new scans to the existing portal, set QR_STAFF_EMIT=false. Removing QR
 
 ## Staff
 
-1. Scan the public QR with a personal phone. For first-time setup, choose **Link this phone**, sign in to Operations Hub and complete its normal MFA if prompted. Choose **Link my phone** in the same phone browser.
+1. Scan the public QR with a personal phone. In the staff app scanner, tap **Open attendance** to continue in the phone browser. For first-time setup, choose **Link this phone**, sign in to Operations Hub and complete its normal MFA if prompted. Choose **Link my phone** in the same phone browser.
 2. Confirm the staff account and tap **Check in** or **Check out**. The workplace tablet code can also be scanned for workplace attendance. Confirmation is required for each punch.
 3. The result shows the recorded time in the company time zone. If the network fails, check the saved status or rescan a fresh code to retry the same action. A stored request ID lets the server return the existing receipt.
 4. Use **Wrong person? Unlink this phone** on that phone, or **Account Security → Manage attendance phones** in the Hub to revoke all of your attendance phones after loss or replacement. Phone credentials last 30 days; revocation, account changes and loss of eligibility can end access earlier.
