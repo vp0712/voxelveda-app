@@ -1,6 +1,7 @@
 'use strict';
 const crypto = require('node:crypto');
 const urls = require('../config/urls');
+const { qrStaffOrigin, qrStaffEmitEnabled } = require('../config/qrStaffOrigin');
 const PREFIX = 'VVATT1', WINDOW_SECONDS = 20;
 function error(message,code='ATTENDANCE_QR_INVALID',statusCode=403) { return Object.assign(new Error(message),{code,statusCode,fields:{qr_proof:message},qr_required:true}); }
 function secret() {
@@ -21,7 +22,20 @@ function encode(claims) {
 function extract(value) {
   const text = String(value || '').trim();
   if (text.startsWith(`${PREFIX}.`) || text.startsWith('VVATT2.')) return text;
-  try { const url = new URL(text); if (url.origin !== urls.app) return ''; return url.searchParams.get('shift_qr_token') || url.searchParams.get('shift_qr') || (url.pathname==='/a'?url.searchParams.get('t'):'') || ''; } catch { return ''; }
+  try {
+    const url = new URL(text);
+    if (url.username || url.password) return '';
+    if (url.origin === urls.app) {
+      return url.searchParams.get('shift_qr_token') || url.searchParams.get('shift_qr') ||
+        (url.pathname === '/a' ? url.searchParams.get('t') : '') || '';
+    }
+    if (url.origin === qrStaffOrigin() && url.pathname === '/a' && url.searchParams.getAll('t').length === 1) {
+      return url.searchParams.get('t') || '';
+    }
+    return '';
+  } catch {
+    return '';
+  }
 }
 function decode(value,now=new Date()) {
   const token = extract(value); if (!token || token.length > 2000) throw error('Scan the current workplace QR code.');
@@ -55,7 +69,8 @@ function createSiteToken(now=new Date()) {
   const current=Math.floor(now.getTime()/1000),expiry=(Math.floor(current/WINDOW_SECONDS)+2)*WINDOW_SECONDS;
   const claims={v:1,purpose:'ATTENDANCE_SITE',site_id:siteId(),iat:current,exp:expiry,user_id:null};
   const token=encode(claims);
-  return {token,qr_data:`${urls.app}/a?t=${compactSiteToken(current)}`,site_id:claims.site_id,site_name:String(process.env.SHIFT_QR_SITE_LABEL||'').trim().slice(0,120),site_kind:'APPLICATION',server_time:now.toISOString(),expires_at:new Date(expiry*1000).toISOString(),expires_in_seconds:expiry-current,refresh_seconds:WINDOW_SECONDS,manual_bypass_enabled:false};
+  const linkOrigin = qrStaffEmitEnabled() ? qrStaffOrigin() : urls.app;
+  return {token,qr_data:`${linkOrigin}/a?t=${compactSiteToken(current)}`,site_id:claims.site_id,site_name:String(process.env.SHIFT_QR_SITE_LABEL||'').trim().slice(0,120),site_kind:'APPLICATION',server_time:now.toISOString(),expires_at:new Date(expiry*1000).toISOString(),expires_in_seconds:expiry-current,refresh_seconds:WINDOW_SECONDS,manual_bypass_enabled:false};
 }
 function validateSiteToken(token,now) {
   const claims=decode(token,now); if (claims.purpose !== 'ATTENDANCE_SITE' || claims.user_id !== null) throw error('Scan the workplace attendance QR code.','ATTENDANCE_QR_WRONG_PURPOSE'); return claims;

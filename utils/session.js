@@ -162,7 +162,7 @@ function safeReturnTo(value, fallback = '/') {
 
 const SIGN_IN_ROUTES = new Set([
   '/dashboard', '/security', '/profile', '/admin', '/client', '/account', '/quality', '/shop-floor',
-  '/attendance-terminal', '/a', '/attendance/scan', '/invoice/view', '/document/view', '/employee-id',
+  '/attendance-terminal', '/a', '/attendance/scan', '/attendance/link-phone', '/invoice/view', '/document/view', '/employee-id',
   '/careers-admin', '/rfqs', '/quotations', '/invoices', '/customers', '/suppliers', '/procurement',
   '/stock', '/inventory', '/raw-material', '/packaging', '/expenses', '/workforce', '/timesheets',
   '/roster', '/staff', '/compliance', '/forms', '/settings', '/meetings', '/tasks', '/trash', '/approvals'

@@ -6,6 +6,13 @@ on:
         description: Exact deployed web commit
         required: true
         type: string
+      scan_origin:
+        description: Expected host embedded in the rotating workplace QR
+        type: choice
+        default: https://app.voxelveda.com
+        options:
+          - https://app.voxelveda.com
+          - https://qr.voxelveda.com
 permissions:
   contents: read
 jobs:
@@ -26,6 +33,7 @@ jobs:
       - name: Verify actual cookie-free display without exposing the private URL
         env:
           ATTENDANCE_DISPLAY_VERIFICATION_URL: ${{ secrets.ATTENDANCE_DISPLAY_VERIFICATION_URL }}
+          VV_EXPECTED_SCAN_ORIGIN: ${{ inputs.scan_origin }}
           VV_EXPECTED_COMMIT: ${{ inputs.deployed_sha }}
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
           DISPLAY_PROOF_DIR: ${{ runner.temp }}/private-display-proof
