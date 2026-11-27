@@ -116,7 +116,7 @@ function fixture(type) {
     luxon:require('luxon'),'../services/attendanceTimeService':require('../services/attendanceTimeService'),'../services/attendanceRecordedTotals':require('../services/attendanceRecordedTotals'),'./weeklyTimesheetDeliveryController':{legacySend:()=>{}},'../services/weeklyTimesheetDeliverySchema':{ensureWeeklyTimesheetDeliverySchema:async()=>{}},'../services/workforceSchema': { async ensureWorkforceSchema() {} }, '../services/documentDeliveryService': {}, '../services/timesheetDocumentService': {}, '../services/emailService': {} };
   if(type==='attendance'){
     const actionService=load('services/attendanceActionService.js',{
-      '../config/db':db,'./attendanceMobileSchema':{ensureAttendanceMobileSchema:async()=>{}},
+      '../config/db':db,'./attendanceMobileSchema':{ensureAttendanceMobileSchema:async()=>{}},'./attendanceLocationService':{locationRequired:()=>false},
       './attendanceTimeService':require('../services/attendanceTimeService'),'./attendanceQrService':{},'./checkoutSummaryService':require('../services/checkoutSummaryService'),
       './attendanceCorrectionService':{assertMutablePeriod:async()=>{}},
       './attendanceMobilePolicy':require('../services/attendanceMobilePolicy'),'./authorizationService':auth,'../utils/dateOnly':dates,

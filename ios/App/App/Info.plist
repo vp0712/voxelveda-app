@@ -49,5 +49,7 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Voxel Veda uses the camera to scan secure shift QR codes for attendance verification.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Voxel Veda uses your location when you record staff attendance to show where the action took place.</string>
 </dict>
 </plist>

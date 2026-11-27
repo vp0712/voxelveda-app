@@ -17,6 +17,8 @@ const portal = 'https://app.voxelveda.com';
 const challenge = 'a'.repeat(64);
 const code = 'c'.repeat(43);
 const token = 'current-fixture-token';
+const locationSample = { latitude: -37.8136, longitude: 144.9631, accuracy: 14 };
+const locationAddress = 'Demo Workshop, Melbourne VIC';
 const displayIntervalMs = 30_000;
 const displayStart = Date.parse('2026-11-27T12:00:00.000Z');
 const displaySlot = time => Math.floor(time / displayIntervalMs);
@@ -32,6 +34,7 @@ class AttendanceFixture {
     this.linked = false;
     this.working = false;
     this.legacyCallback = false;
+    this.locationRequired = false;
     this.nextFault = null;
     this.displayTime = displayStart;
     this.confirmations = [];
@@ -44,7 +47,8 @@ class AttendanceFixture {
     return {
       ...normalSession, status: this.working ? 'WORKING' : 'NOT_STARTED',
       action: this.working ? 'CHECK_OUT' : 'CHECK_IN',
-      attendance_id: this.working ? 721 : null
+      attendance_id: this.working ? 721 : null,
+      location_required: this.locationRequired
     };
   }
 
@@ -71,6 +75,7 @@ class AttendanceFixture {
         return route.fulfill({ body: image.buffer, contentType: 'image/png' });
       }
       if (origin === portal && pathname === '/attendance/link-phone') return serve(views + 'approve.html');
+      if (origin === qr && pathname === '/qr-staff/attendance-location.js') return serve('public/attendance-location.js');
       if (/^\/qr-staff\/(site\.css|staff\.js|approve\.js|display\.js)$/.test(pathname)) return serve('views' + pathname);
       if (pathname === '/logo.png') return serve('public/logo.png');
       if (origin === qr && pathname === '/qr-api/session') return json(this.linked ? this.session() : { linked: false });
@@ -115,6 +120,13 @@ class AttendanceFixture {
               assert.equal(body.qr_proof, 'browser-fixture-proof');
             }
             assert.match(body.request_id, /^[0-9a-f-]{36}$/i);
+            if (this.locationRequired) {
+              const { captured_at, ...position } = body.location;
+              assert.deepEqual(position, locationSample);
+              assert.equal(new Date(captured_at).toISOString(), captured_at);
+            } else {
+              assert.equal(Object.hasOwn(body, 'location'), false);
+            }
             this.confirmations.push(body);
             const fault = this.nextFault;
             this.nextFault = null;
@@ -125,7 +137,8 @@ class AttendanceFixture {
               this.working = !this.working;
               this.receipts.set(body.request_id, {
                 request_id: body.request_id, action: body.action, attendance_id: 721,
-                saved_at: new Date().toISOString(), timezone: normalSession.timezone
+                saved_at: new Date().toISOString(), timezone: normalSession.timezone,
+                ...(body.location ? { location_address: locationAddress } : {})
               });
             }
             if (fault === 'after-save') return route.abort();
@@ -191,16 +204,23 @@ async function test() {
     headless: true, ...(process.env.VV_CHROMIUM_PATH ? { executablePath: process.env.VV_CHROMIUM_PATH } : {})
   });
   try {
-    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
     const fixture = new AttendanceFixture();
-    await context.route('**/*', async route => {
-      try { await fixture.respond(route); }
-      catch (error) {
-        fixture.unexpected.push(String(error));
-        await route.fulfill({ status: 500, body: 'Browser fixture error' }).catch(() => {});
-      }
-    });
-    await verifyDisplayRotation(context, fixture);
+    async function createContext() {
+      const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
+      await context.route('**/*', async route => {
+        try { await fixture.respond(route); }
+        catch (error) {
+          fixture.unexpected.push(String(error));
+          await route.fulfill({ status: 500, body: 'Browser fixture error' }).catch(() => {});
+        }
+      });
+      return context;
+    }
+    const displayContext = await createContext();
+    try { await verifyDisplayRotation(displayContext, fixture); }
+    finally { await displayContext.close(); }
+
+    const context = await createContext();
     const page = await context.newPage();
     page.on('pageerror', error => fixture.unexpected.push(String(error)));
     page.setDefaultTimeout(6000);
@@ -327,8 +347,58 @@ async function test() {
     assert.equal(fixture.confirmations.at(-1).request_id, remoteCheckout.request_id);
     assert.deepEqual(await pending(), []);
     assert.equal(fixture.receipts.size, 4);
+
+    fixture.locationRequired = true;
+    await context.setGeolocation(locationSample);
+    await page.addInitScript(() => {
+      const geolocation = navigator.geolocation;
+      const getPosition = geolocation.getCurrentPosition.bind(geolocation);
+      window.locationRequests = 0;
+      geolocation.getCurrentPosition = (...args) => {
+        window.locationRequests++;
+        return getPosition(...args);
+      };
+    });
+    const cdp = await context.newCDPSession(page);
+    const { targetInfo } = await cdp.send('Target.getTargetInfo');
+    const setLocationPermission = setting => cdp.send('Browser.setPermission', {
+      permission: { name: 'geolocation' }, setting, origin: qr,
+      browserContextId: targetInfo.browserContextId
+    });
+    const remoteScanCount = countPosts('/qr-api/remote/scan');
+    const remoteConfirmCount = countPosts('/qr-api/remote/confirm');
+    const locationRequests = () => page.evaluate(() => window.locationRequests);
+    await setLocationPermission('denied');
+    await page.goto(remote);
+    await title('Location required');
+    assert.equal(await locationRequests(), 0);
+    await click('Share location');
+    await page.waitForFunction(() => /location access was denied/i.test(document.querySelector('#message')?.textContent || ''));
+    assert.equal(await locationRequests(), 1);
+    assert.equal(await page.getByRole('button', { name: 'Check in', exact: true }).count(), 0);
+    assert.equal(countPosts('/qr-api/remote/scan'), remoteScanCount);
+    assert.equal(countPosts('/qr-api/remote/confirm'), remoteConfirmCount);
+    assert.equal(fixture.receipts.size, 4);
+
+    await setLocationPermission('granted');
+    await page.reload();
+    await title('Location required');
+    assert.equal(await locationRequests(), 0);
+    await click('Share location');
+    await title('Check in');
+    assert.equal(await locationRequests(), 1);
+    assert.equal(countPosts('/qr-api/remote/scan'), remoteScanCount + 1);
+    assert.equal(countPosts('/qr-api/remote/confirm'), remoteConfirmCount);
+    assert.equal(fixture.receipts.size, 4);
+    await click('Check in');
+    await title('Checked in');
+    assert.equal(await locationRequests(), 1);
+    assert.equal(countPosts('/qr-api/remote/confirm'), remoteConfirmCount + 1);
+    assert.ok((await page.locator('#details').innerText()).includes(locationAddress));
+    assert.deepEqual(await pending(), []);
+    assert.equal(fixture.receipts.size, 5);
     assert.deepEqual(fixture.unexpected, []);
-    console.log('PASS: mobile Chromium decoded two public QR codes across a 30-second rollover and verified pairing, workplace and remote confirmation, retry recovery, unlink and revocation with simulated API endpoints.');
+    console.log('PASS: mobile Chromium verified public QR rotation, pairing, workplace and remote confirmation, retries, unlink, revocation, and explicit location permission with simulated API endpoints.');
   } finally {
     await browser.close();
   }

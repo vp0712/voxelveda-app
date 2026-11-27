@@ -70,6 +70,13 @@ public class MainActivity extends BridgeActivity {
                 if (!NavigationPolicy.isApplication(request.getOrigin().toString())) { request.deny(); return; }
                 super.onPermissionRequest(request);
             }
+            @Override public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+                if (!NavigationPolicy.isApplication(origin)) {
+                    callback.invoke(origin, false, false);
+                    return;
+                }
+                super.onGeolocationPermissionsShowPrompt(origin, callback);
+            }
             @Override public boolean onCreateWindow(WebView source, boolean dialog, boolean gesture, Message message) {
                 WebView popup = new WebView(MainActivity.this);
                 class ApplicationPopupClient extends WebViewClient {

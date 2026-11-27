@@ -11,6 +11,11 @@ const STATEMENTS = [
     response_json LONGTEXT NOT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uniq_attendance_action_request(user_id,request_id), INDEX idx_attendance_receipt_session(attendance_id,created_at)
   ) ENGINE=InnoDB`,
+  `CREATE TABLE IF NOT EXISTS attendance_punch_locations (
+    attendance_id INT NOT NULL, user_id INT NOT NULL, action ENUM('CHECK_IN','CHECK_OUT') NOT NULL,
+    address VARCHAR(500) NOT NULL,
+    PRIMARY KEY (attendance_id,action), INDEX idx_attendance_punch_location_owner(user_id,attendance_id)
+  ) ENGINE=InnoDB`,
   `CREATE TABLE IF NOT EXISTS attendance_break_intervals (
     id BIGINT AUTO_INCREMENT PRIMARY KEY, attendance_id INT NOT NULL, user_id INT NOT NULL,
     started_at DATETIME NOT NULL, ended_at DATETIME NULL,
