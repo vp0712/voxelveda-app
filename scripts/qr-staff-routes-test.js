@@ -6,8 +6,10 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const express = require('express');
 const http = require('node:http');
+const { createCanvas, loadImage } = require('@napi-rs/canvas');
+const decodeQr = require('jsqr');
 
-test('QR host isolates portal, pairs one browser and accepts only an explicit staff punch', async t => {
+test('QR host isolates the portal and requires a linked phone and explicit workplace or remote confirmation', async t => {
   const domain = 'qr.voxelveda.com';
   const qrOrigin = 'https://' + domain;
   const appHost = 'app.voxelveda.com';
@@ -20,12 +22,14 @@ test('QR host isolates portal, pairs one browser and accepts only an explicit st
 
   const token = 'a'.repeat(43), verifier = 'b'.repeat(43), code = 'c'.repeat(43), challenge = 'd'.repeat(64);
   const requestId = '97269cea-c6c0-4937-924e-68736b4baac1';
+  const remoteRequestId = '9c483248-239c-42d8-b122-5b7001adc017';
   const user = { id: 17, role: 'staff', username: 'Test staff' };
   const state = {
     allowed_actions: ['CHECK_IN'], status: 'NOT_STARTED', profile: { name: 'Test staff' },
     company_timezone: 'Australia/Melbourne', tasks: ['private'], timeline: ['private']
   };
-  let confirmed, record, commits = 0, removed = false;
+  const records = new Map();
+  let confirmed, removed = false;
   function stub(name, exports) {
     const filename = require.resolve(name);
     const previous = require.cache[filename];
@@ -60,23 +64,30 @@ test('QR host isolates portal, pairs one browser and accepts only an explicit st
     }
   });
   stub('../services/attendanceActionService', {
-    resolveQr: async ({ user: actor, input }) => {
+    resolveQr: async ({ user: actor, input, remoteDeviceId }) => {
       assert.equal(actor.id, user.id);
+      if (remoteDeviceId != null) {
+        assert.equal(remoteDeviceId, 7);
+        assert.equal(input.token, undefined);
+        assert.equal(input.action, 'CHECK_IN');
+        assert.equal(input.attendance_id, null);
+        return { qr_proof: 'remote-proof', expires_at: new Date(Date.now() + 30000).toISOString() };
+      }
       assert.deepEqual(input, { token: 'site-token', action: 'CHECK_IN', attendance_id: null });
       return { qr_proof: 'proof', expires_at: new Date(Date.now() + 30000).toISOString() };
     },
     performAction: async args => {
       confirmed = args;
-      if (!record) {
-        commits++;
-        record = { attendance: { clock_in: '2026-01-20T00:10:00Z', notes: 'private' }, action: 'CHECK_IN', attendance_id: 5, request_id: requestId };
+      const id = args.input.request_id;
+      if (!records.has(id)) {
+        records.set(id, { attendance: { clock_in: '2026-01-20T00:10:00Z', notes: 'private' }, action: 'CHECK_IN', attendance_id: 5, request_id: id });
       }
-      return { ...record, state };
+      return { ...records.get(id), state };
     },
     reconcileAction: async ({ user: actor, requestId: id }) => {
       assert.equal(actor.id, user.id);
       assert.equal(id, requestId);
-      return { receipt: record, state };
+      return { receipt: records.get(id), state };
     }
   });
   stub('../middleware/securityMiddleware', { rateLimit: () => (_req, _res, next) => next() });
@@ -105,14 +116,18 @@ test('QR host isolates portal, pairs one browser and accepts only an explicit st
         const chunks = [];
         response.on('data', chunk => chunks.push(chunk));
         response.on('error', reject);
-        response.once('end', () => resolve({
-          status: response.statusCode,
-          headers: {
-            get: name => String(response.headers[name.toLowerCase()] || ''),
-            getSetCookie: () => response.headers['set-cookie'] || []
-          },
-          json: () => JSON.parse(Buffer.concat(chunks).toString())
-        }));
+        response.once('end', () => {
+          const bytes = Buffer.concat(chunks);
+          resolve({
+            status: response.statusCode,
+            headers: {
+              get: name => String(response.headers[name.toLowerCase()] || ''),
+              getSetCookie: () => response.headers['set-cookie'] || []
+            },
+            bytes,
+            json: () => JSON.parse(bytes.toString())
+          });
+        });
       });
       call.on('error', reject);
       call.end(body);
@@ -133,16 +148,34 @@ test('QR host isolates portal, pairs one browser and accepts only an explicit st
   delete process.env.QR_STAFF_ORIGIN;
   assert.equal((await get('/')).status, 503);
   process.env.QR_STAFF_ORIGIN = qrOrigin;
-  for (const file of ['index.html', 'approve.html', 'staff.js']) {
+  for (const file of ['index.html', 'approve.html', 'display.html', 'display.js', 'staff.js', 'attendance.png']) {
     assert.equal((await get('/qr-staff/' + file, '', appHost)).status, 404);
   }
   assert.equal((await get('/qr-staff/approve.js', '', appHost)).status, 200);
+  assert.equal((await get('/qr-staff/display.js')).status, 200);
   assert.equal((await get('/qr-staff/site.css', '', appHost)).status, 200);
+  const display = await get('/');
+  assert.equal(display.status, 200);
+  assert.match(display.bytes.toString(), /src="\/qr-staff\/attendance\.png"/);
+  const qrImage = await get('/qr-staff/attendance.png');
+  assert.equal(qrImage.status, 200);
+  assert.match(qrImage.headers.get('content-type'), /^image\/png\b/);
+  const image = await loadImage(qrImage.bytes);
+  const canvas = createCanvas(image.width, image.height);
+  const context = canvas.getContext('2d');
+  context.drawImage(image, 0, 0);
+  const pixels = context.getImageData(0, 0, image.width, image.height);
+  assert.equal(decodeQr(pixels.data, image.width, image.height)?.data, qrOrigin + '/remote');
   const page = await get('/a?t=site-token');
   assert.equal(page.status, 200);
   assert.equal(page.headers.get('referrer-policy'), 'no-referrer');
   assert.match(page.headers.get('cache-control'), /no-store/);
-  assert.equal(commits, 0);
+  for (const path of ['/setup', '/remote']) {
+    const entry = await get(path);
+    assert.equal(entry.status, 200);
+    assert.deepEqual(entry.bytes, page.bytes);
+  }
+  assert.equal(records.size, 0);
 
   assert.equal((await post('/qr-api/link/start', {}, '', domain, { Origin: 'https://' + appHost })).status, 403);
   const start = await post('/qr-api/link/start', {});
@@ -152,7 +185,7 @@ test('QR host isolates portal, pairs one browser and accepts only an explicit st
   assert.doesNotMatch(start.headers.get('set-cookie'), /Domain=/i);
   assert.equal((await start.json()).url, 'https://' + appHost + '/attendance/link-phone?challenge=' + challenge);
   const approval = await post('/attendance/link-phone', { challenge }, '', appHost);
-  assert.equal((await approval.json()).url, qrOrigin + '/#code=' + code);
+  assert.equal((await approval.json()).url, qrOrigin + '/setup#code=' + code);
   assert.equal((await post('/attendance/link-phone', { challenge }, '', appHost, { 'Test-Impersonate': 'yes' })).status, 403);
   assert.equal((await post('/qr-api/link/finish', { code })).status, 401);
   const linked = await post('/qr-api/link/finish', { code }, verifierJar);
@@ -167,7 +200,7 @@ test('QR host isolates portal, pairs one browser and accepts only an explicit st
   assert.equal((await post('/qr-api/scan', { token: 'site-token', user_id: 298 }, deviceJar)).status, 400);
   const scan = await (await post('/qr-api/scan', { token: 'site-token' }, deviceJar)).json();
   assert.equal(scan.qr_proof, 'proof');
-  assert.equal(commits, 0);
+  assert.equal(records.size, 0);
   const confirm = { token: 'site-token', qr_proof: scan.qr_proof, request_id: requestId, action: scan.action, attendance_id: null };
   assert.equal((await post('/qr-api/confirm', { ...confirm, action: 'BREAK_START' }, deviceJar)).status, 422);
   const saved = await (await post('/qr-api/confirm', confirm, deviceJar)).json();
@@ -180,7 +213,36 @@ test('QR host isolates portal, pairs one browser and accepts only an explicit st
   const reconcile = await (await post('/qr-api/reconcile', { request_id: requestId }, deviceJar)).json();
   assert.equal(reconcile.found, true);
   assert.deepEqual(reconcile.receipt, saved.receipt);
-  assert.equal(commits, 1);
+  assert.equal(records.size, 1);
+
+  assert.equal((await get('/qr-api/remote/confirm', deviceJar)).status, 404);
+  assert.equal((await post('/qr-api/remote/scan', {})).status, 401);
+  assert.equal((await post('/qr-api/remote/scan', {}, deviceJar, domain, { Origin: 'https://' + appHost })).status, 403);
+  assert.equal((await post('/qr-api/remote/scan', { token: 'site-token' }, deviceJar)).status, 400);
+  const remoteScan = await post('/qr-api/remote/scan', {}, deviceJar);
+  assert.equal(remoteScan.status, 200);
+  const remote = await remoteScan.json();
+  assert.equal(remote.qr_proof, 'remote-proof');
+  assert.equal(records.size, 1);
+
+  const remoteConfirm = { qr_proof: remote.qr_proof, request_id: remoteRequestId, action: remote.action, attendance_id: null };
+  assert.equal((await post('/qr-api/remote/confirm', remoteConfirm)).status, 401);
+  assert.equal((await post('/qr-api/remote/confirm', remoteConfirm, deviceJar, domain, { Origin: 'https://' + appHost })).status, 403);
+  assert.equal((await post('/qr-api/remote/confirm', { ...remoteConfirm, token: 'site-token' }, deviceJar)).status, 400);
+  assert.equal(records.size, 1);
+  const remoteSaved = await post('/qr-api/remote/confirm', remoteConfirm, deviceJar);
+  assert.equal(remoteSaved.status, 200);
+  assert.equal(confirmed.remoteQr, true);
+  assert.equal(confirmed.requireSiteScan, false);
+  assert.equal(confirmed.phoneDeviceId, 7);
+  assert.equal(confirmed.user.id, 17);
+  const { site_token: siteToken, ...remoteInput } = confirmed.input;
+  assert.equal(siteToken, undefined);
+  assert.deepEqual(remoteInput, remoteConfirm);
+  assert.equal((await remoteSaved.json()).receipt.request_id, remoteRequestId);
+  assert.equal(records.size, 2);
+
   assert.equal((await post('/qr-api/unlink', {}, deviceJar)).status, 200);
   assert.equal((await post('/qr-api/scan', { token: 'site-token' }, deviceJar)).status, 401);
+  assert.equal((await post('/qr-api/remote/confirm', remoteConfirm, deviceJar)).status, 401);
 });

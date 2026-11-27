@@ -4,14 +4,18 @@
 // Run from the app checkout with Playwright available (VV_BROWSER_MODULE_PATH is optional).
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const { createCanvas, loadImage } = require('@napi-rs/canvas');
+const jsQR = require('jsqr');
+const { renderAttendanceQr } = require('../services/attendanceQrRenderer');
 const { chromium } = require(process.env.VV_BROWSER_MODULE_PATH || 'playwright');
 
 const rootDir = path.resolve(__dirname, '..');
 const views = 'views/qr-staff/';
 const qr = 'https://qr.voxelveda.com';
+const remote = qr + '/remote';
 const portal = 'https://app.voxelveda.com';
 const challenge = 'a'.repeat(64);
-const code = 'browser-test-only';
+const code = 'c'.repeat(43);
 const token = 'current-fixture-token';
 const normalSession = {
   linked: true, staff_name: 'Demo Staff', staff_id: 114,
@@ -22,6 +26,7 @@ class AttendanceFixture {
   constructor() {
     this.linked = false;
     this.working = false;
+    this.legacyCallback = false;
     this.nextFault = null;
     this.confirmations = [];
     this.receipts = new Map();
@@ -44,9 +49,14 @@ class AttendanceFixture {
     const serve = relative => route.fulfill({ path: path.join(rootDir, relative) });
     if (![qr, portal].includes(origin)) throw new Error('Unexpected origin ' + origin);
     if (request.method() === 'GET') {
-      if (origin === qr && ['/', '/a'].includes(pathname)) return serve(views + 'index.html');
+      if (origin === qr && pathname === '/') return serve(views + 'display.html');
+      if (origin === qr && ['/setup', '/a', '/remote'].includes(pathname)) return serve(views + 'index.html');
+      if (origin === qr && pathname === '/qr-staff/attendance.png') {
+        const image = await renderAttendanceQr(remote, 16);
+        return route.fulfill({ body: image.buffer, contentType: 'image/png' });
+      }
       if (origin === portal && pathname === '/attendance/link-phone') return serve(views + 'approve.html');
-      if (/^\/qr-staff\/(site\.css|staff\.js|approve\.js)$/.test(pathname)) return serve('views' + pathname);
+      if (/^\/qr-staff\/(site\.css|staff\.js|approve\.js|display\.js)$/.test(pathname)) return serve('views' + pathname);
       if (pathname === '/logo.png') return serve('public/logo.png');
       if (origin === qr && pathname === '/qr-api/session') return json(this.linked ? this.session() : { linked: false });
     } else if (request.method() === 'POST') {
@@ -55,7 +65,7 @@ class AttendanceFixture {
       if (origin === portal) {
         if (pathname === '/attendance/link-phone') {
           assert.equal(body.challenge, challenge);
-          return json({ url: qr + '/#code=' + code });
+          return json({ url: qr + (this.legacyCallback ? '/#code=' : '/setup#code=') + code });
         }
         if (pathname === '/attendance/phones/revoke-all') {
           this.linked = false;
@@ -74,10 +84,21 @@ class AttendanceFixture {
             assert.ok(this.linked);
             if (body.token !== token) return json({ message: 'This QR code has expired.' }, 403);
             return json({ ...this.session(), qr_proof: 'browser-fixture-proof', expires_at: new Date(Date.now() + 30000).toISOString() });
+          case '/qr-api/remote/scan':
+            assert.ok(this.linked);
+            assert.deepEqual(body, {});
+            return json({ ...this.session(), qr_proof: 'browser-fixture-remote-proof', expires_at: new Date(Date.now() + 30000).toISOString() });
+          case '/qr-api/remote/confirm':
           case '/qr-api/confirm': {
             assert.ok(this.linked);
-            assert.equal(body.token, token);
-            assert.equal(body.qr_proof, 'browser-fixture-proof');
+            assert.equal(Object.hasOwn(body, 'source'), false);
+            if (pathname === '/qr-api/remote/confirm') {
+              assert.equal(Object.hasOwn(body, 'token'), false);
+              assert.equal(body.qr_proof, 'browser-fixture-remote-proof');
+            } else {
+              assert.equal(body.token, token);
+              assert.equal(body.qr_proof, 'browser-fixture-proof');
+            }
             assert.match(body.request_id, /^[0-9a-f-]{36}$/i);
             this.confirmations.push(body);
             const fault = this.nextFault;
@@ -133,6 +154,19 @@ async function test() {
     const countPosts = pathname => fixture.posts.filter(saved => saved === pathname).length;
 
     await page.goto(qr);
+    assert.equal(await page.locator('body').innerText(), '');
+    const displayed = page.getByRole('img', { name: 'Scan this QR code to open staff attendance' });
+    await page.waitForFunction(() => document.querySelector('img')?.naturalWidth > 0);
+    const image = await loadImage(await displayed.screenshot());
+    const canvas = createCanvas(image.width, image.height);
+    const canvasContext = canvas.getContext('2d');
+    canvasContext.drawImage(image, 0, 0);
+    const pixels = canvasContext.getImageData(0, 0, image.width, image.height);
+    assert.equal(jsQR(new Uint8ClampedArray(pixels.data), image.width, image.height)?.data, remote);
+    assert.equal(fixture.posts.length, 0);
+
+    fixture.legacyCallback = true;
+    await page.goto(qr + '/setup');
     await title('Link your phone');
     assert.equal(fixture.posts.length, 0);
     await click('Link this phone');
@@ -141,8 +175,9 @@ async function test() {
     assert.equal(new URL(page.url()).search, '');
     await click('Link my phone');
     await title('Scan the workplace QR');
-    assert.equal(page.url(), qr + '/');
+    assert.equal(page.url(), qr + '/setup');
     assert.deepEqual(fixture.posts, ['/qr-api/link/start', '/attendance/link-phone', '/qr-api/link/finish']);
+    fixture.legacyCallback = false;
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
 
     await scan('expired-fixture');
@@ -151,7 +186,7 @@ async function test() {
     assert.equal(fixture.confirmations.length, 0);
     await scan(token);
     await title('Check in');
-    assert.equal(page.url(), qr + '/');
+    assert.equal(page.url(), qr + '/a');
     assert.match(await page.locator('#details').innerText(), /Demo Staff/);
     assert.equal(fixture.confirmations.length, 0);
 
@@ -172,8 +207,15 @@ async function test() {
     await title('Attendance needs checking');
     const first = fixture.confirmations[1];
     assert.equal((await pending())[0].request_id, first.request_id);
-    await page.reload();
+    await page.evaluate(() => {
+      const key = Object.keys(localStorage).find(name => name.startsWith('vv.qr.pending.'));
+      const { source, ...legacy } = JSON.parse(localStorage.getItem(key));
+      localStorage.setItem(key, JSON.stringify(legacy));
+    });
+    await page.goto(remote);
     await title('Attendance needs checking');
+    assert.equal(countPosts('/qr-api/remote/scan'), 0);
+    assert.match(await page.locator('#message').innerText(), /fresh workplace code/);
     await scan(token);
     await title('Check out');
     assert.equal(fixture.confirmations.length, 2);
@@ -201,8 +243,45 @@ async function test() {
     await click('Confirm unlink all phones');
     await title('Phones unlinked');
     assert.equal(countPosts('/attendance/phones/revoke-all'), 1);
+
+    await page.goto(remote);
+    await title('Link your phone');
+    await click('Link this phone');
+    await title('Link this phone');
+    await click('Link my phone');
+    await title('Check in');
+    assert.equal(page.url(), remote);
+    assert.equal(countPosts('/qr-api/remote/scan'), 1);
+    assert.equal(countPosts('/qr-api/remote/confirm'), 0);
+    assert.match(await page.locator('#details').innerText(), /Remote/);
+    assert.doesNotMatch(await page.locator('#details').innerText(), /Workplace/);
+    await click('Check in');
+    await title('Checked in');
+    assert.equal(countPosts('/qr-api/remote/confirm'), 1);
+    assert.match(await page.locator('#details').innerText(), /Remote/);
+
+    await page.reload();
+    await title('Check out');
+    assert.equal(countPosts('/qr-api/remote/confirm'), 1);
+    fixture.nextFault = 'before-save';
+    await click('Check out');
+    await title('Attendance needs checking');
+    const remoteCheckout = fixture.confirmations.at(-1);
+    assert.equal((await pending())[0].source, 'remote');
+    const workplaceScans = countPosts('/qr-api/scan');
+    await scan(token);
+    await title('Attendance needs checking');
+    assert.equal(countPosts('/qr-api/scan'), workplaceScans);
+    await click('Open remote attendance');
+    await title('Check out');
+    assert.equal(countPosts('/qr-api/remote/confirm'), 2);
+    await click('Check out');
+    await title('Checked out');
+    assert.equal(fixture.confirmations.at(-1).request_id, remoteCheckout.request_id);
+    assert.deepEqual(await pending(), []);
+    assert.equal(fixture.receipts.size, 4);
     assert.deepEqual(fixture.unexpected, []);
-    console.log('PASS: mobile Chromium phone linking, fresh/expired scans, explicit confirmation, double-tap, saved and unsaved response loss, reload/retry, unlink and portal revocation. UI endpoints were simulated.');
+    console.log('PASS: mobile Chromium decoded the public QR and verified pairing, workplace and remote confirmation, retry recovery, unlink and revocation with simulated API endpoints.');
   } finally {
     await browser.close();
   }
