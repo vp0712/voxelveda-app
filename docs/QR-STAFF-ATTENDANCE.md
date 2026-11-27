@@ -1,6 +1,6 @@
 # Staff attendance on qr.voxelveda.com
 
-The QR site uses the existing Voxel Veda service, database and timesheet. The base address shows a public QR with the company logo in the centre. It opens the remote attendance flow, where staff must link their phone and confirm each punch. Remote attendance is allowed offsite. The private workplace display continues to issue its rotating code independently.
+The QR site uses the existing Voxel Veda service, database and timesheet. The base address shows a public QR with the company logo in the centre and the caption **Scan for attendance**. The displayed QR changes every 30 seconds. Each version opens the remote attendance flow, where staff must link their phone and confirm each punch. Remote attendance is allowed offsite. The private workplace display continues to issue its rotating code independently.
 
 ## Release
 

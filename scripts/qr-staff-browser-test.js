@@ -17,6 +17,11 @@ const portal = 'https://app.voxelveda.com';
 const challenge = 'a'.repeat(64);
 const code = 'c'.repeat(43);
 const token = 'current-fixture-token';
+const displayIntervalMs = 30_000;
+const displayStart = Date.parse('2026-11-27T12:00:00.000Z');
+const displaySlot = time => Math.floor(time / displayIntervalMs);
+const imagePath = slot => '/qr-staff/attendance.png?v=' + slot;
+const scanUrl = slot => remote + '?v=' + slot;
 const normalSession = {
   linked: true, staff_name: 'Demo Staff', staff_id: 114,
   site_name: 'Demo Workshop', timezone: 'Australia/Melbourne'
@@ -28,6 +33,7 @@ class AttendanceFixture {
     this.working = false;
     this.legacyCallback = false;
     this.nextFault = null;
+    this.displayTime = displayStart;
     this.confirmations = [];
     this.receipts = new Map();
     this.posts = [];
@@ -44,15 +50,24 @@ class AttendanceFixture {
 
   async respond(route) {
     const request = route.request();
-    const { origin, pathname } = new URL(request.url());
+    const { origin, pathname, searchParams } = new URL(request.url());
     const json = (body, status = 200) => route.fulfill({ status, json: body });
     const serve = relative => route.fulfill({ path: path.join(rootDir, relative) });
     if (![qr, portal].includes(origin)) throw new Error('Unexpected origin ' + origin);
     if (request.method() === 'GET') {
       if (origin === qr && pathname === '/') return serve(views + 'display.html');
       if (origin === qr && ['/setup', '/a', '/remote'].includes(pathname)) return serve(views + 'index.html');
+      if (origin === qr && pathname === '/qr-staff/current') {
+        const slot = displaySlot(this.displayTime);
+        return json({
+          image_url: imagePath(slot),
+          expires_at: new Date((slot + 1) * displayIntervalMs).toISOString(),
+          server_time: new Date(this.displayTime).toISOString()
+        });
+      }
       if (origin === qr && pathname === '/qr-staff/attendance.png') {
-        const image = await renderAttendanceQr(remote, 16);
+        const version = searchParams.get('v') ?? String(displaySlot(this.displayTime));
+        const image = await renderAttendanceQr(scanUrl(version), 16);
         return route.fulfill({ body: image.buffer, contentType: 'image/png' });
       }
       if (origin === portal && pathname === '/attendance/link-phone') return serve(views + 'approve.html');
@@ -128,6 +143,49 @@ class AttendanceFixture {
   }
 }
 
+async function verifyDisplayRotation(context, fixture) {
+  const page = await context.newPage();
+  page.on('pageerror', error => fixture.unexpected.push(String(error)));
+  page.setDefaultTimeout(6000);
+  try {
+    await page.clock.install({ time: new Date(displayStart - 60_000) });
+    await page.clock.pauseAt(new Date(displayStart));
+    await page.goto(qr);
+    const caption = (await page.locator('figcaption').innerText()).trim();
+    assert.ok(caption.length > 0);
+    assert.doesNotMatch(caption, /\p{N}/u);
+    const displayed = page.getByRole('img', { name: 'Scan this QR code to open staff attendance' });
+
+    async function decodeDisplayed(slot) {
+      await displayed.and(page.locator(`img[src$="${imagePath(slot)}"]`)).waitFor();
+      const image = await loadImage(await displayed.screenshot());
+      const canvas = createCanvas(image.width, image.height);
+      const canvasContext = canvas.getContext('2d');
+      canvasContext.drawImage(image, 0, 0);
+      const pixels = canvasContext.getImageData(0, 0, image.width, image.height);
+      return jsQR(new Uint8ClampedArray(pixels.data), image.width, image.height)?.data;
+    }
+
+    const firstSlot = displaySlot(displayStart);
+    const first = await decodeDisplayed(firstSlot);
+    assert.equal(first, scanUrl(firstSlot));
+    await page.clock.runFor(displayIntervalMs - 1);
+    const firstImage = await displayed.getAttribute('src');
+    assert.equal(new URL(firstImage, qr).href, qr + imagePath(firstSlot));
+    fixture.displayTime += displayIntervalMs;
+    await page.clock.runFor(1);
+    const nextSlot = firstSlot + 1;
+    const next = await decodeDisplayed(nextSlot);
+    assert.equal(next, scanUrl(nextSlot));
+    assert.notEqual(next, first);
+    assert.notEqual(await displayed.getAttribute('src'), firstImage);
+    assert.equal((await page.locator('figcaption').innerText()).trim(), caption);
+    assert.equal(fixture.posts.length, 0);
+  } finally {
+    await page.close();
+  }
+}
+
 async function test() {
   const browser = await chromium.launch({
     headless: true, ...(process.env.VV_CHROMIUM_PATH ? { executablePath: process.env.VV_CHROMIUM_PATH } : {})
@@ -142,6 +200,7 @@ async function test() {
         await route.fulfill({ status: 500, body: 'Browser fixture error' }).catch(() => {});
       }
     });
+    await verifyDisplayRotation(context, fixture);
     const page = await context.newPage();
     page.on('pageerror', error => fixture.unexpected.push(String(error)));
     page.setDefaultTimeout(6000);
@@ -152,18 +211,6 @@ async function test() {
     const scan = value => page.goto(qr + '/a?t=' + value);
     const pending = () => page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('vv.qr.pending.')).map(key => JSON.parse(localStorage.getItem(key))));
     const countPosts = pathname => fixture.posts.filter(saved => saved === pathname).length;
-
-    await page.goto(qr);
-    assert.equal(await page.locator('body').innerText(), '');
-    const displayed = page.getByRole('img', { name: 'Scan this QR code to open staff attendance' });
-    await page.waitForFunction(() => document.querySelector('img')?.naturalWidth > 0);
-    const image = await loadImage(await displayed.screenshot());
-    const canvas = createCanvas(image.width, image.height);
-    const canvasContext = canvas.getContext('2d');
-    canvasContext.drawImage(image, 0, 0);
-    const pixels = canvasContext.getImageData(0, 0, image.width, image.height);
-    assert.equal(jsQR(new Uint8ClampedArray(pixels.data), image.width, image.height)?.data, remote);
-    assert.equal(fixture.posts.length, 0);
 
     fixture.legacyCallback = true;
     await page.goto(qr + '/setup');
@@ -281,7 +328,7 @@ async function test() {
     assert.deepEqual(await pending(), []);
     assert.equal(fixture.receipts.size, 4);
     assert.deepEqual(fixture.unexpected, []);
-    console.log('PASS: mobile Chromium decoded the public QR and verified pairing, workplace and remote confirmation, retry recovery, unlink and revocation with simulated API endpoints.');
+    console.log('PASS: mobile Chromium decoded two public QR codes across a 30-second rollover and verified pairing, workplace and remote confirmation, retry recovery, unlink and revocation with simulated API endpoints.');
   } finally {
     await browser.close();
   }

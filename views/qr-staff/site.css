@@ -22,7 +22,9 @@ body { margin: 0; color: var(--ink); background: var(--bg); }
 main { width: min(100%, 30rem); margin: 0 auto; padding: max(1.5rem, env(safe-area-inset-top)) 1rem max(2rem, env(safe-area-inset-bottom)); }
 .attendance-display { background: #fff; }
 .attendance-display main { min-height: 100vh; min-height: 100dvh; width: 100%; display: grid; place-items: center; padding: 1rem; }
-.attendance-display img { display: block; width: min(100%, 656px); width: min(100%, 656px, calc(100dvh - 2rem)); height: auto; }
+.attendance-display figure { display: grid; justify-items: center; gap: .5rem; width: 100%; margin: 0; }
+.attendance-display img { display: block; width: min(100%, 656px); width: min(100%, 656px, calc(100dvh - 4rem)); height: auto; }
+.attendance-display figcaption { color: #14243d; text-align: center; }
 header { display: flex; align-items: center; gap: 1rem; margin: .5rem 0 1.5rem; }
 header img { display: block; object-fit: contain; flex-shrink: 0; }
 h1 { margin: 0; font-size: 1.25rem; font-weight: 620; }

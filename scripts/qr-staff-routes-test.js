@@ -148,7 +148,7 @@ test('QR host isolates the portal and requires a linked phone and explicit workp
   delete process.env.QR_STAFF_ORIGIN;
   assert.equal((await get('/')).status, 503);
   process.env.QR_STAFF_ORIGIN = qrOrigin;
-  for (const file of ['index.html', 'approve.html', 'display.html', 'display.js', 'staff.js', 'attendance.png']) {
+  for (const file of ['index.html', 'approve.html', 'display.html', 'display.js', 'staff.js', 'attendance.png', 'current']) {
     assert.equal((await get('/qr-staff/' + file, '', appHost)).status, 404);
   }
   assert.equal((await get('/qr-staff/approve.js', '', appHost)).status, 200);
@@ -156,21 +156,62 @@ test('QR host isolates the portal and requires a linked phone and explicit workp
   assert.equal((await get('/qr-staff/site.css', '', appHost)).status, 200);
   const display = await get('/');
   assert.equal(display.status, 200);
-  assert.match(display.bytes.toString(), /src="\/qr-staff\/attendance\.png"/);
-  const qrImage = await get('/qr-staff/attendance.png');
-  assert.equal(qrImage.status, 200);
-  assert.match(qrImage.headers.get('content-type'), /^image\/png\b/);
-  const image = await loadImage(qrImage.bytes);
-  const canvas = createCanvas(image.width, image.height);
-  const context = canvas.getContext('2d');
-  context.drawImage(image, 0, 0);
-  const pixels = context.getImageData(0, 0, image.width, image.height);
-  assert.equal(decodeQr(pixels.data, image.width, image.height)?.data, qrOrigin + '/remote');
+  assert.match(display.bytes.toString(), /src="\/qr-staff\/display\.js"/);
+
+  const qrImagePath = '/qr-staff/attendance.png';
+  const rotationMs = 30000;
+  let now = Date.UTC(2026, 0, 20, 0, 10, 15);
+  const clock = t.mock.method(Date, 'now', () => now);
+  async function currentDisplay() {
+    const response = await get('/qr-staff/current');
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('cache-control'), /no-store/);
+    return response.json();
+  }
+  async function readQr(path, slot) {
+    const response = await get(path);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-type'), /^image\/png\b/);
+    const image = await loadImage(response.bytes);
+    const canvas = createCanvas(image.width, image.height);
+    const context = canvas.getContext('2d');
+    context.drawImage(image, 0, 0);
+    const { data } = context.getImageData(0, 0, image.width, image.height);
+    assert.equal(decodeQr(data, image.width, image.height)?.data, `${qrOrigin}/remote?v=${slot}`);
+    return response.bytes;
+  }
+  const firstSlot = Math.floor(now / rotationMs);
+  const first = await currentDisplay();
+  assert.deepEqual(first, {
+    image_url: `${qrImagePath}?v=${firstSlot}`,
+    expires_at: new Date((firstSlot + 1) * rotationMs).toISOString(),
+    server_time: new Date(now).toISOString()
+  });
+  const firstPng = await readQr(first.image_url, firstSlot);
+  assert.deepEqual((await get(qrImagePath)).bytes, firstPng);
+
+  now = (firstSlot + 1) * rotationMs;
+  const next = await currentDisplay();
+  assert.deepEqual(next, {
+    image_url: `${qrImagePath}?v=${firstSlot + 1}`,
+    expires_at: new Date(now + rotationMs).toISOString(),
+    server_time: new Date(now).toISOString()
+  });
+  const nextPng = await readQr(next.image_url, firstSlot + 1);
+  assert.notDeepEqual(nextPng, firstPng);
+  const previous = await get(first.image_url);
+  assert.equal(previous.status, 200);
+  assert.deepEqual(previous.bytes, firstPng);
+  for (const slot of [firstSlot - 1, firstSlot + 2, 'invalid']) {
+    assert.equal((await get(`${qrImagePath}?v=${slot}`)).status, 404);
+  }
+  clock.mock.restore();
+
   const page = await get('/a?t=site-token');
   assert.equal(page.status, 200);
   assert.equal(page.headers.get('referrer-policy'), 'no-referrer');
   assert.match(page.headers.get('cache-control'), /no-store/);
-  for (const path of ['/setup', '/remote']) {
+  for (const path of ['/setup', '/remote', `/remote?v=${firstSlot - 1}`]) {
     const entry = await get(path);
     assert.equal(entry.status, 200);
     assert.deepEqual(entry.bytes, page.bytes);
