@@ -1,9 +1,9 @@
-application-release: 20261127-public-staff-attendance-qr
-candidate-commit: fc5409f8640ab0ddd98455c11150438f2f9b1ab1
-merged-commit: bc1678389a8a15c12c3d34d879280d3d905c0641
+application-release: 20261127-public-attendance-qr-rotation
+candidate-commit: a63c457ea7d6c4ee0b257178423663adb652e408
+merged-commit: 8b8070038cf7dd128b14502ec3326e3293b8224a
 production-branch: main
-previous-live-commit: 800b4928d97588ceb3fcdca47c36a11ec62bb1d4
-scope: branded public staff attendance QR with linked-phone confirmation for approved offsite check-in and checkout in the existing timesheet
+previous-live-commit: 272e326a87cab011672037dbadcd8cd6549d5cf1
+scope: public attendance QR changes every 30 seconds and shows a scan caption below the original-logo QR
 preserved: unchanged-original-logo-ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312; navy-light-dark-theme; existing-records-IDs-attachments-audit-encryption-keys-security-domain-and-startup-guards
 notifications: single-focused-responsive-centre; authorised-unread-count-and-specific-record-links; durable-per-recipient-read-state-and-event-version-deduplication; retained-original-invoice-expense-events; retired-links-blocked; mixed-schema-collations-compatible; profile-preferences-only
 avatars: one-authenticated-byte-and-Blob-renderer; genuine-image-decode-EXIF-orientation-square-crop-size-pixel-scan-validation; private-S3-first-or-retained-database-storage; audited-references; immediate-refresh-and-account-isolation; settled-failure-cache-and-controlled-retry
@@ -15,15 +15,15 @@ weekly-delivery: worked-shifts-only; explicit-REGISTERED_EMAIL-policy-v2-using-u
 weekly-schedule: retained-Monday-0700-Australia-Sydney-default-and-configured-Australian-IANA-timezone; bounded-latest-completed-week; no-zero-hour-email-or-historical-backfill
 pdf-delivery: retained-immutable-source-and-parser-validated-PDF-bytes-hash-version; at-least-one-valid-page-and-identity; application-pdf-safe-pdf-filename-and-disposition; non-PDF-and-error-downloads-rejected; uncertain-provider-outcomes-held-for-review
 ci: 510 syntax checks, 106 application regression scripts, mobile Chromium QR decoding and confirmation, disposable MySQL workplace and remote HTTP-to-timesheet proof
-ci-candidate-release-run: 46004339479:Application Release Candidate CI:success; 46004339523:Current sidebar, charts and internal content:success; 46004339480:Final System Consolidation:success; 46004339524:Original Application MySQL Regression:success; 46004339739:Security CI:success
-ci-merged-release-run: 46007452607:Application Release Candidate CI:success; 46007452666:Current sidebar, charts and internal content:success; 46007452761:Enterprise Audit Evidence:success; 46007452709:Final System Consolidation:success; 46007452718:Original Application MySQL Regression:success; 46007452735:Security CI:success
+ci-candidate-release-run: 46012246546:Application Release Candidate CI:success; 46012246551:Current sidebar, charts and internal content:success; 46012246585:Final System Consolidation:success; 46012246555:Original Application MySQL Regression:success; 46012246566:Security CI:success
+ci-merged-release-run: 46015437326:Application Release Candidate CI:success; 46015437394:Current sidebar, charts and internal content:success; 46015437387:Enterprise Audit Evidence:success; 46015437334:Final System Consolidation:success; 46015437246:Original Application MySQL Regression:success; 46015437278:Security CI:success
 failed-release-attempt: a886e793e9247fa5406a2d71e83d38a8376a682b-Railway-4f7e2ee5-2378-430f-bc41-665b38b152eb; build-fixture-mocked-unconfigured-scanner; repaired-clean-scanner-fixture-and-required-production-CI; production-upload-security-unchanged
 failed-private-storage-attempt: 618f0cd79796a2458d7065347a7bedcb6acc1da3-Railway-65dbe8f2-76e2-42b3-a06e-51da11bdbc1c; legacy-database-fixture-inherited-selected-private-provider; scoped-environment-restoration-and-explicit-unavailable-storage-rejection-verified; production-private-storage-guard-unchanged
 browser-evidence: populated-75-invoice-backend-paging-null-vs-zero-full-filtered-totals-errors-retry-edit-revision-and-payment-receipt-reconciliation; 16-invoice-and-16-staff-width-theme-cases-plus-14-procurement-cases; 80-public-account-layout-cases; real-local-PDFjs-renderer-and-exact-parser-validated-PDF-download; retained-RFQ-edit-history-archive-restore-import-private-source-report-workflows; actual-branded-QR-decoder-rotations-outage-reconnect-and-240-mandatory-samples
-verification-limits: The public QR is approved for offsite use. The private workplace hostname cutover still requires its physical-phone pilot and live timesheet verification.
+verification-limits: Verify the live public QR by decoding consecutive display slots. The private workplace hostname cutover requires its separate physical-phone pilot.
 configuration: same-Railway-service-domain-database-and-private-storage; explicit-Resend-HTTPS-company-and-document-transport; authorised-info-at-voxelveda-dot-com-sender; no-subscription-billing-DNS-or-signing-change; unchanged-three-predeploy-guards
 relay-status: Resend-HTML-queue158-and-PDF-queue159-provider-accepted-once; earlier-WordPress-implementation-not-changed-or-attributed-as-TMP-root-cause; historical-and-uncertain-queue-outcomes-preserved; recipient-receipt-and-received-MIME-remain-unverified
-rollback: Previous healthy source 800b4928d97588ceb3fcdca47c36a11ec62bb1d4 and Railway deployment 32bb1a44-042b-4ed0-9892-9db1b60fad93. Preserve staff attendance records and the additive phone-link schema.
+rollback: Previous healthy source 272e326a87cab011672037dbadcd8cd6549d5cf1 and Railway deployment 67821db1-5769-4a61-b43d-08212886cd64. Preserve staff attendance records and the additive phone-link schema.
 qr-gate: 104-byte-canonical-HTTPS-url; VVATT2-full-SHA256-HMAC-site-binding-and-existing-bounded-expiration; original-logo-embedded-in-every-integer-module-H-QR; four-module-quiet-zone; load-complete-before-swap; server-clock-expiry-and-stale-code-hide; 12-hour-site-bound-display-only-HttpOnly-kiosk-cookie; authenticated-EDIT_ATTENDANCE-issuance
 camera-entry: protected-GET-safe-login-return; authenticated-POST-token-and-current-clock-state-revalidation; explicit-confirmation-and-durable-request-id-required; never-public-GET-attendance
 public-entry: Log-in-and-Sign-up-only-plus-Privacy-Terms; unchanged-viewer-customer-signup-and-administrator-employee-invitation; no-public-role-grant
@@ -201,3 +201,7 @@ qr-staff-attendance-pilot-activation: Link an authorised test phone, use fresh w
 public-staff-attendance-qr-source: PR348 and docs/QR-STAFF-ATTENDANCE.md. The gated PR and merged-main trees match. The release commit changes only this marker.
 public-staff-attendance-qr-configuration: QR_STAFF_ORIGIN=https://qr.voxelveda.com and QR_STAFF_EMIT=false on the existing Railway production service. The public HTTPS certificate was independently verified.
 public-staff-attendance-qr-activation: The public homepage shows the original-logo QR linking to /remote. A linked staff phone must explicitly confirm each punch. The private workplace QR keeps its existing hostname.
+
+public-attendance-qr-rotation-source: PR349 and docs/QR-STAFF-ATTENDANCE.md. The gated PR and merged-main trees match. The release commit changes only this marker.
+public-attendance-qr-rotation-configuration: QR_STAFF_ORIGIN=https://qr.voxelveda.com and QR_STAFF_EMIT=false on the existing Railway production service. The public HTTPS certificate was independently verified.
+public-attendance-qr-rotation-activation: The public homepage refreshes the company-logo QR in 30-second slots and displays Scan for attendance instead of a numeric countdown. Each version links to /remote.
