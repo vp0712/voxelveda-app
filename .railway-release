@@ -1,9 +1,9 @@
-application-release: 20261127-public-attendance-qr-rotation
-candidate-commit: a63c457ea7d6c4ee0b257178423663adb652e408
-merged-commit: 8b8070038cf7dd128b14502ec3326e3293b8224a
+application-release: 20261127-staff-scanner-public-qr
+candidate-commit: 48002c5798c16357384f47230d289b04caf54008
+merged-commit: f05f2da7bb1fe865ec5dd7ed3b5869471f4e03ed
 production-branch: main
-previous-live-commit: 272e326a87cab011672037dbadcd8cd6549d5cf1
-scope: public attendance QR changes every 30 seconds and shows a scan caption below the original-logo QR
+previous-live-commit: 35d399e1c813722fd9231bfa1ee4efd69fcba6c1
+scope: staff app scanner recognises the public QR and uses the linked-phone browser handoff for the existing confirmation flow
 preserved: unchanged-original-logo-ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312; navy-light-dark-theme; existing-records-IDs-attachments-audit-encryption-keys-security-domain-and-startup-guards
 notifications: single-focused-responsive-centre; authorised-unread-count-and-specific-record-links; durable-per-recipient-read-state-and-event-version-deduplication; retained-original-invoice-expense-events; retired-links-blocked; mixed-schema-collations-compatible; profile-preferences-only
 avatars: one-authenticated-byte-and-Blob-renderer; genuine-image-decode-EXIF-orientation-square-crop-size-pixel-scan-validation; private-S3-first-or-retained-database-storage; audited-references; immediate-refresh-and-account-isolation; settled-failure-cache-and-controlled-retry
@@ -14,16 +14,16 @@ mobile: 44px-icon-targets-wrapping-toolbars; retained-accessible-names-contextua
 weekly-delivery: worked-shifts-only; explicit-REGISTERED_EMAIL-policy-v2-using-users.email; no-designated-address-fallback; exactly-one-To-no-CC-no-BCC-or-manager-copy; current-account-and-source-rechecked; durable-staff-week-revision-idempotency; historical-accepted-recipients-preserved
 weekly-schedule: retained-Monday-0700-Australia-Sydney-default-and-configured-Australian-IANA-timezone; bounded-latest-completed-week; no-zero-hour-email-or-historical-backfill
 pdf-delivery: retained-immutable-source-and-parser-validated-PDF-bytes-hash-version; at-least-one-valid-page-and-identity; application-pdf-safe-pdf-filename-and-disposition; non-PDF-and-error-downloads-rejected; uncertain-provider-outcomes-held-for-review
-ci: 510 syntax checks, 106 application regression scripts, mobile Chromium QR decoding and confirmation, disposable MySQL workplace and remote HTTP-to-timesheet proof
-ci-candidate-release-run: 46012246546:Application Release Candidate CI:success; 46012246551:Current sidebar, charts and internal content:success; 46012246585:Final System Consolidation:success; 46012246555:Original Application MySQL Regression:success; 46012246566:Security CI:success
-ci-merged-release-run: 46015437326:Application Release Candidate CI:success; 46015437394:Current sidebar, charts and internal content:success; 46015437387:Enterprise Audit Evidence:success; 46015437334:Final System Consolidation:success; 46015437246:Original Application MySQL Regression:success; 46015437278:Security CI:success
+ci: 510 syntax checks, 106 application regression scripts, mobile scanner handoff and lookalike rejection, installed Android verification and existing MySQL attendance tests
+ci-candidate-release-run: 46020985427:Android installed application verification:success; 46020985363:Application Release Candidate CI:success; 46020985437:Current sidebar, charts and internal content:success; 46020985411:Final System Consolidation:success; 46020985384:Original Application MySQL Regression:success; 46020985322:Security CI:success
+ci-merged-release-run: 46024000538:Android installed application verification:success; 46024000652:Application Release Candidate CI:success; 46024000651:Current sidebar, charts and internal content:success; 46024000519:Enterprise Audit Evidence:success; 46024000540:Final System Consolidation:success; 46024000515:Original Application MySQL Regression:success; 46024000742:Security CI:success
 failed-release-attempt: a886e793e9247fa5406a2d71e83d38a8376a682b-Railway-4f7e2ee5-2378-430f-bc41-665b38b152eb; build-fixture-mocked-unconfigured-scanner; repaired-clean-scanner-fixture-and-required-production-CI; production-upload-security-unchanged
 failed-private-storage-attempt: 618f0cd79796a2458d7065347a7bedcb6acc1da3-Railway-65dbe8f2-76e2-42b3-a06e-51da11bdbc1c; legacy-database-fixture-inherited-selected-private-provider; scoped-environment-restoration-and-explicit-unavailable-storage-rejection-verified; production-private-storage-guard-unchanged
 browser-evidence: populated-75-invoice-backend-paging-null-vs-zero-full-filtered-totals-errors-retry-edit-revision-and-payment-receipt-reconciliation; 16-invoice-and-16-staff-width-theme-cases-plus-14-procurement-cases; 80-public-account-layout-cases; real-local-PDFjs-renderer-and-exact-parser-validated-PDF-download; retained-RFQ-edit-history-archive-restore-import-private-source-report-workflows; actual-branded-QR-decoder-rotations-outage-reconnect-and-240-mandatory-samples
-verification-limits: Verify the live public QR by decoding consecutive display slots. The private workplace hostname cutover requires its separate physical-phone pilot.
+verification-limits: Verify the production scanner assets and public attendance destination. Installed Android CI uses an emulator. The private workplace hostname cutover requires its separate physical-phone pilot.
 configuration: same-Railway-service-domain-database-and-private-storage; explicit-Resend-HTTPS-company-and-document-transport; authorised-info-at-voxelveda-dot-com-sender; no-subscription-billing-DNS-or-signing-change; unchanged-three-predeploy-guards
 relay-status: Resend-HTML-queue158-and-PDF-queue159-provider-accepted-once; earlier-WordPress-implementation-not-changed-or-attributed-as-TMP-root-cause; historical-and-uncertain-queue-outcomes-preserved; recipient-receipt-and-received-MIME-remain-unverified
-rollback: Previous healthy source 272e326a87cab011672037dbadcd8cd6549d5cf1 and Railway deployment 67821db1-5769-4a61-b43d-08212886cd64. Preserve staff attendance records and the additive phone-link schema.
+rollback: Previous healthy source 35d399e1c813722fd9231bfa1ee4efd69fcba6c1 and Railway deployment 29e06c3e-a358-41e0-9138-cb8ccee9d27f. Preserve staff attendance records and the additive phone-link schema.
 qr-gate: 104-byte-canonical-HTTPS-url; VVATT2-full-SHA256-HMAC-site-binding-and-existing-bounded-expiration; original-logo-embedded-in-every-integer-module-H-QR; four-module-quiet-zone; load-complete-before-swap; server-clock-expiry-and-stale-code-hide; 12-hour-site-bound-display-only-HttpOnly-kiosk-cookie; authenticated-EDIT_ATTENDANCE-issuance
 camera-entry: protected-GET-safe-login-return; authenticated-POST-token-and-current-clock-state-revalidation; explicit-confirmation-and-durable-request-id-required; never-public-GET-attendance
 public-entry: Log-in-and-Sign-up-only-plus-Privacy-Terms; unchanged-viewer-customer-signup-and-administrator-employee-invitation; no-public-role-grant
@@ -205,3 +205,7 @@ public-staff-attendance-qr-activation: The public homepage shows the original-lo
 public-attendance-qr-rotation-source: PR349 and docs/QR-STAFF-ATTENDANCE.md. The gated PR and merged-main trees match. The release commit changes only this marker.
 public-attendance-qr-rotation-configuration: QR_STAFF_ORIGIN=https://qr.voxelveda.com and QR_STAFF_EMIT=false on the existing Railway production service. The public HTTPS certificate was independently verified.
 public-attendance-qr-rotation-activation: The public homepage refreshes the company-logo QR in 30-second slots and displays Scan for attendance instead of a numeric countdown. Each version links to /remote.
+
+staff-scanner-public-qr-source: PR350 and docs/QR-STAFF-ATTENDANCE.md. The gated PR and merged-main trees match. The release commit changes only this marker.
+staff-scanner-public-qr-configuration: QR_STAFF_ORIGIN=https://qr.voxelveda.com and QR_STAFF_EMIT=false on the existing Railway production service. The public HTTPS certificate was independently verified.
+staff-scanner-public-qr-activation: After scanning the public code in the staff app, tap Open attendance. On native shells approve the existing browser prompt and confirm with the linked staff phone.
