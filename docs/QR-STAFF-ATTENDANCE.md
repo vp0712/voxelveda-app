@@ -23,7 +23,16 @@ To return new scans to the existing portal, set QR_STAFF_EMIT=false. Removing QR
 
 Keep the existing tablet's private display bookmark. The Hub's Shift QR Control → Display settings → Manage display links remains the place to create or replace it. Direct phone setup is at `/setup`. The public QR opens `/remote`, which uses a short-lived confirmation proof scoped to the linked phone and records the public QR source in the audit log.
 
+## Punch location rollout
+
+The location requirement is disabled by default. Before setting `ATTENDANCE_LOCATION_REQUIRED=true`, configure the company's approved HTTPS reverse-geocoding endpoint in `ATTENDANCE_GEOCODER_URL` and its optional bearer token in `ATTENDANCE_GEOCODER_TOKEN`. The endpoint accepts a JSON `POST` with `latitude` and `longitude` and returns a JSON object with an `address` string. Confirm the company's staff notice and retention policy for these records before activation. Verify the browser flow and the location-capable installed Android and iOS builds on physical devices before requiring location in production.
+
+When enabled, each new check-in and check-out needs a fresh foreground location. Staff can grant access at the prompt and retry if permission is denied. Coordinates are used for address lookup and excluded from persisted attendance and audit records. The saved address is available to the staff member in their attendance record. Existing punches and break actions continue to use their existing records.
+
+## Verification
+
 - Install locked packages with npm ci and run npm run build from the repo root.
 - Mobile browser fixture: node scripts/qr-staff-browser-test.js with Playwright and Chromium available. VV_BROWSER_MODULE_PATH and VV_CHROMIUM_PATH can select existing test installations.
 - Phone credential and concurrency test: QR_PHONE_TEST=1 DB_PORT=3307 node scripts/qr-phone-mysql-test.js on a local disposable MySQL server with permission to create its temporary schema. Set DB_USER and DB_PASSWORD for that local server if required.
 - Full HTTP-to-timesheet test: in the existing localhost MySQL 8.4 regression environment (NODE_ENV=test, REPAIR_DB_TEST=true, DB_NAME=voxelveda_repair_test), run node scripts/qr-staff-timesheet-mysql-test.js after the retained schema fixture. Run it again with `--remote` to verify the public QR flow. Each run creates a synthetic user, verifies two confirmed actions and checks the actual weekly endpoint after one minute of server time.
+- Add `--location` to the HTTP-to-timesheet fixture to test mandatory location, both saved addresses and receipt retries using a mocked resolver.

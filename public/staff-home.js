@@ -6,6 +6,7 @@
   const actionLabels={CHECK_IN:'Check in',CHECK_OUT:'Check out',BREAK_START:'Start break',BREAK_END:'End break'};
   let identity=null,today=null,loading=null,homeFailed=false,overlayKind=null,overlayReturn=null,submitBusy=false,serverOffset=0;
   let pending=null,history=[],corrections=[],historyScope='own',historyMeta={},correctionMeta={},historyStatus='ALL',sessionStatus='ALL',historySearch='',historyFrom='',historyTo='',historyUserId='',historySequence=0;
+  let attendanceLocation = null;
   let authEpoch=0,identityPromise=null,identityFingerprint='',applyingVerifiedProfile=false,boundaryTimer=null;
   const requests=new Set(),resultLeases=new WeakMap();
   let liveTimer=null,reconcileTimer=null,clockAnchor=null,stateEpoch=0;
@@ -154,10 +155,10 @@
       finally{if(loading===promise)loading=null;}
     })();loading=promise;return promise;
   }
-  function closeOverlay(){window.VoxelAttendanceScanner?.stop();$('staffAttendanceOverlay').hidden=true;overlayKind=null;$('staffProfileMenu').hidden=true;$('staffProfileMenuToggle').setAttribute('aria-expanded','false');}
+  function closeOverlay(){attendanceLocation=null;window.VoxelAttendanceScanner?.stop();$('staffAttendanceOverlay').hidden=true;overlayKind=null;$('staffProfileMenu').hidden=true;$('staffProfileMenuToggle').setAttribute('aria-expanded','false');}
   function close(){if(window.VoxelOverlay)window.VoxelOverlay.close('staff-attendance');else{closeOverlay();document.body.classList.remove('staff-attendance-open');overlayReturn?.focus?.();}}
   function openSheet(title,body,kind='attendance'){
-    overlayReturn=document.activeElement;window.VoxelAttendanceScanner?.stop();window.closeStaffNotificationPanel?.();window.toggleMobileMenu?.(false);$('staffProfileMenu').hidden=true;$('staffProfileMenuToggle').setAttribute('aria-expanded','false');
+    attendanceLocation=null;overlayReturn=document.activeElement;window.VoxelAttendanceScanner?.stop();window.closeStaffNotificationPanel?.();window.toggleMobileMenu?.(false);$('staffProfileMenu').hidden=true;$('staffProfileMenuToggle').setAttribute('aria-expanded','false');
     if(window.VoxelOverlay){if(window.VoxelOverlay.open('staff-attendance',closeOverlay,overlayReturn)===false)return;}else document.body.classList.add('staff-attendance-open');
     overlayKind=kind;setText('staffAttendanceTitle',title);$('staffAttendanceBody').innerHTML=body;$('staffAttendanceOverlay').hidden=false;document.querySelector('.staff-attendance-sheet')?.focus();
   }
@@ -168,10 +169,40 @@
     $('staffAttendanceBody').querySelector('[aria-invalid="true"]')?.focus();
   }
   function button(id,label,className='primary-btn'){return `<button type="button" id="${id}" class="${className}">${escape(label)}</button>`;}
+  const locationRequired = action => today?.location_required === true && ['CHECK_IN', 'CHECK_OUT'].includes(action);
+  const freshLocation = () => window.VoxelAttendanceLocation?.isFresh(attendanceLocation);
+  async function captureAttendanceLocation() {
+    if (!window.VoxelAttendanceLocation) throw new Error('Location is unavailable. Refresh the page and try again.');
+    return window.VoxelAttendanceLocation.capture();
+  }
+  async function withAttendanceLocation(action, ready) {
+    if (!locationRequired(action)) return ready(null);
+    if (freshLocation()) return ready(attendanceLocation);
+
+    const lease = account();
+    openSheet('Share location for attendance', `<p>Share your current location to ${escape(actionLabels[action].toLowerCase())}. Your location is submitted when you confirm.</p><div class="staff-sheet-actions">${button('staffAttendanceLocationRetry', 'Retry location')}${button('staffAttendanceLocationCancel', 'Cancel', 'secondary-btn')}</div>`, 'location');
+    const retry = $('staffAttendanceLocationRetry');
+    $('staffAttendanceLocationCancel').onclick = close;
+    const active = () => current(lease) && overlayKind === 'location' && retry === $('staffAttendanceLocationRetry');
+    retry.onclick = async () => {
+      retry.disabled = true;
+      $('staffAttendanceError')?.remove();
+      let sample;
+      try { sample = await captureAttendanceLocation(); }
+      catch (error) { if (active()) sheetError(error.message); }
+      finally { if (active()) retry.disabled = false; }
+      if (sample && active()) await ready(sample);
+    };
+    await retry.onclick();
+  }
   const publicAttendanceUrl = 'https://qr.voxelveda.com/remote';
   const isPublicAttendanceQr = value => /^https:\/\/qr\.voxelveda\.com\/remote(?:\?v=[0-9]{1,12})?$/.test(value);
-  async function startCamera(action,retainedRequest=null){
+  function startCamera(action, retainedRequest = null) {
+    return withAttendanceLocation(action, sample => startScanner(action, retainedRequest, sample));
+  }
+  async function startScanner(action,retainedRequest,sample){
     const lease=account();openSheet(actionLabels[action],`<p class="staff-sheet-subtitle">Scan a Voxel Veda attendance QR. You will review and confirm ${escape(actionLabels[action].toLowerCase())} before anything is saved.</p><div class="staff-scanner-camera"><video id="staffAttendanceVideo" muted autoplay playsinline></video><span class="staff-scanner-frame" aria-hidden="true"></span></div><p id="staffAttendanceScanStatus" class="staff-scanner-status" role="status">Preparing camera...</p><div class="staff-sheet-actions">${button('staffAttendanceCameraRetry','Retry camera','secondary-btn')}${button('staffAttendanceScanCancel','Cancel','secondary-btn')}</div>`,'scan');
+    attendanceLocation = sample;
     $('staffAttendanceCameraRetry').onclick=()=>startCamera(action,retainedRequest);$('staffAttendanceScanCancel').onclick=close;
     if(window.VoxelNativeApp){const settings=document.createElement('button');settings.type='button';settings.className='secondary-btn';settings.textContent='App camera settings';settings.onclick=()=>window.VoxelNativeApp.openCameraSettings().catch(()=>setText('staffAttendanceScanStatus','Open Android Settings, choose Voxel Veda, and allow camera access.'));$('staffAttendanceCameraRetry').after(settings);}
     await window.VoxelAttendanceScanner.start({video:$('staffAttendanceVideo'),onStatus:message=>{if(current(lease)&&overlayKind==='scan')setText('staffAttendanceScanStatus',message);},onError:message=>{if(!current(lease)||overlayKind!=='scan')return;setText('staffAttendanceScanStatus',message);$('staffAttendanceScanStatus')?.setAttribute('data-error','true');},onToken:token=>current(lease)&&overlayKind==='scan'?verifyQr(action,token,retainedRequest):undefined});
@@ -192,7 +223,7 @@
     setText('staffAttendanceScanStatus','Checking the QR and your current attendance...');
     const refreshed=await refresh();if(!current(lease))return;if(!refreshed||!allowed(action)){sheetError('Your shift state changed. Close this scanner and review the current attendance before trying again.');return;}
     if(retainedRequest&&action!=='CHECK_IN'&&String(retainedRequest.attendance_id)!==String(activeId())){sheetError('The original session is no longer active. Check the original request again; a different session will not be changed.');return;}
-    try{const proof=await api('/api/attendance/qr/validate',{method:'POST',body:JSON.stringify({token,action,...(action==='CHECK_OUT'?{attendance_id:activeId()}:{})})});assertCurrent(lease);assertResult(proof);if(proof.valid!==true||proof.action!==action||!proof.qr_proof||String(proof.attendance_id??'')!==String(action==='CHECK_OUT'?activeId()??'':''))throw new Error('The QR does not match this attendance action. Scan a current workplace QR.');if(overlayKind!=='scan')return;confirmAction(action,proof.qr_proof,proof,retainedRequest);}catch(error){if(error.staleAccount||!current(lease))return;if(overlayKind==='scan'){setText('staffAttendanceScanStatus',`${error.message} No attendance was changed.`);$('staffAttendanceScanStatus')?.setAttribute('data-error','true');}}
+    try{const proof=await api('/api/attendance/qr/validate',{method:'POST',body:JSON.stringify({token,action,...(action==='CHECK_OUT'?{attendance_id:activeId()}:{})})});assertCurrent(lease);assertResult(proof);if(proof.valid!==true||proof.action!==action||!proof.qr_proof||String(proof.attendance_id??'')!==String(action==='CHECK_OUT'?activeId()??'':''))throw new Error('The QR does not match this attendance action. Scan a current workplace QR.');if(overlayKind!=='scan')return;await withAttendanceLocation(action,sample=>confirmAction(action,proof.qr_proof,proof,retainedRequest,sample));}catch(error){if(error.staleAccount||!current(lease))return;if(overlayKind==='scan'){setText('staffAttendanceScanStatus',`${error.message} No attendance was changed.`);$('staffAttendanceScanStatus')?.setAttribute('data-error','true');}}
   }
   let attendanceIntentHandled=false;
   async function acceptCameraIntent(){
@@ -205,9 +236,12 @@
     if(pending)return reconcileView();
     const action=allowed('CHECK_OUT')?'CHECK_OUT':allowed('CHECK_IN')?'CHECK_IN':null;
     if(!action){showError('Attendance is unavailable for your current state. No attendance was changed.');return;}
-    openSheet('Verify workplace code',`<p id="staffAttendanceScanStatus" role="status">Checking the code…</p><div class="staff-sheet-actions">${button('staffAttendanceIntentCancel','Cancel','secondary-btn')}</div>`,'scan');
-    $('staffAttendanceIntentCancel').onclick=close;
-    await verifyQr(action,token);
+    await withAttendanceLocation(action, async sample => {
+      openSheet('Verify workplace code',`<p id="staffAttendanceScanStatus" role="status">Checking the code…</p><div class="staff-sheet-actions">${button('staffAttendanceIntentCancel','Cancel','secondary-btn')}</div>`,'scan');
+      attendanceLocation = sample;
+      $('staffAttendanceIntentCancel').onclick=close;
+      await verifyQr(action,token);
+    });
   }
   async function openAction(action){
     if(submitBusy)return;if(pending)return reconcileView();
@@ -217,16 +251,47 @@
     const lease=account(),refreshed=await refresh();if(!current(lease)||!refreshed)return;
     if(!allowed(action)){showError('This attendance action is no longer available. Your current shift has been refreshed.');return;}
     if(['CHECK_IN','CHECK_OUT'].includes(action)&&today.qr_required!==false)return startCamera(action);
-    confirmAction(action,null);
+    await withAttendanceLocation(action, sample => confirmAction(action, null, {}, null, sample));
   }
-  function confirmAction(action,proof,verified={},retainedRequest=null){
-    const lease=account();const attendanceId=action==='CHECK_IN'?null:activeId();const request={request_id:retainedRequest?.request_id||uuid(),action,...(attendanceId?{attendance_id:attendanceId}:{}),...(proof?{qr_proof:proof}:{})};
+  function confirmAction(action,proof,verified,retainedRequest,sample){
+    const lease=account();
+    if (!allowed(action) || (retainedRequest && action !== 'CHECK_IN' && String(retainedRequest.attendance_id) !== String(activeId()))) {
+      sheetError('The attendance action changed while obtaining the location. Close this sheet and review your current attendance.');
+      return;
+    }
+    const attendanceId=action==='CHECK_IN'?null:activeId();const request={request_id:retainedRequest?.request_id||uuid(),action,...(attendanceId?{attendance_id:attendanceId}:{}),...(proof?{qr_proof:proof}:{})};
     openSheet(`Confirm ${actionLabels[action].toLowerCase()}`,`<p>${escape(identity?.name||identity?.username||'Your signed-in account')} is about to ${escape(actionLabels[action].toLowerCase())}.</p>${verified.site_name?`<p class="staff-sheet-subtitle">Workplace: ${escape(verified.site_name)}</p>`:verified.site_id?`<p class="staff-sheet-subtitle">Verified attendance site: ${escape(verified.site_id)}</p>`:''}${today.active_attendance?`<p class="staff-sheet-subtitle">Current session started ${escape(formatInstant(today.active_attendance.clock_in))}. This action applies to that session only.</p>`:''}<p class="staff-sheet-subtitle">${proof?'Workplace QR verified. ':''}Time is recorded by the server in ${escape(today.company_timezone)}.</p><div class="staff-sheet-actions">${button('staffAttendanceConfirm',`Confirm ${actionLabels[action].toLowerCase()}`)}${button('staffAttendanceCancel','Cancel','secondary-btn')}</div>`,'confirm');
+    attendanceLocation = sample;
     $('staffAttendanceCancel').onclick=close;$('staffAttendanceConfirm').onclick=()=>{if(current(lease))return submitAction(request);};
   }
   async function submitAction(request){
-    if(submitBusy)return;const lease=account();submitBusy=true;rememberPending(request);const confirm=$('staffAttendanceConfirm');if(confirm){confirm.disabled=true;confirm.setAttribute('aria-busy','true');}renderActions();
-    try{const result=await api('/api/attendance/actions',{method:'POST',body:JSON.stringify(request)});assertCurrent(lease);assertResult(result);if(String(result.request_id)!==String(request.request_id)||result.action!==request.action)throw Object.assign(new Error('The server response could not be matched to this attendance request. Check its status before trying again.'),{uncertain:true});clearPending();if(result.state){adoptState(result.state);clearError();renderToday();}else await refresh();await window.loadTimesheet?.();assertCurrent(lease);if(request.action==='CHECK_OUT'){openCheckoutNote(result.attendance_id,result.attendance||{});}else{close();window.showToast?.(`${actionLabels[request.action]} recorded.`,{kind:'success',background:true});}}
+    if(submitBusy)return;const lease=account();submitBusy=true;const confirm=$('staffAttendanceConfirm');if(confirm){confirm.disabled=true;confirm.setAttribute('aria-busy','true');}renderActions();
+    try {
+      let sample;
+      if (locationRequired(request.action)) {
+        try { sample = freshLocation() ? attendanceLocation : await captureAttendanceLocation(); }
+        catch (error) {
+          if (current(lease) && overlayKind === 'confirm' && confirm === $('staffAttendanceConfirm')) sheetError(error.message);
+          return;
+        }
+        if (!current(lease) || overlayKind !== 'confirm' || confirm !== $('staffAttendanceConfirm')) return;
+      }
+      attendanceLocation = null;
+      rememberPending(request);
+      const body = sample ? { ...request, location: sample } : request;
+      const result = await api('/api/attendance/actions', { method: 'POST', body: JSON.stringify(body) });
+      assertCurrent(lease);
+      assertResult(result);
+      if (String(result.request_id) !== String(request.request_id) || result.action !== request.action) throw Object.assign(new Error('The server response could not be matched to this attendance request. Check its status before trying again.'), { uncertain: true });
+      clearPending();
+      if (result.state) { adoptState(result.state); clearError(); renderToday(); }
+      else await refresh();
+      await window.loadTimesheet?.();
+      assertCurrent(lease);
+      if (request.action === 'CHECK_OUT') openCheckoutNote(result.attendance_id, result.attendance || {}, result.attendance?.check_out_address);
+      else if (request.action === 'CHECK_IN' && result.attendance?.check_in_address) showAttendanceReceipt('Check in was recorded.', result.attendance.check_in_address);
+      else { close(); window.showToast?.(`${actionLabels[request.action]} recorded.`, { kind: 'success', background: true }); }
+    }
     catch(error){if(error.staleAccount||!current(lease))return;if(error.uncertain){openSheet('Check attendance status',`<p>The response was interrupted. This request may already have been saved. Do not scan again until its status has been checked.</p><div class="staff-sheet-actions">${button('staffAttendanceReconcile','Check server status')}${button('staffAttendancePendingClose','Close','secondary-btn')}</div>`,'pending');$('staffAttendanceReconcile').onclick=reconcileView;$('staffAttendancePendingClose').onclick=close;}else{clearPending();sheetError(error.message,error.fields);await refresh();if(!current(lease))return;if(String(error.code||'').startsWith('ATTENDANCE_QR_')&&overlayKind==='confirm'){if(confirm)confirm.dataset.qrExpired='true';$('staffAttendanceRescan')?.parentElement.remove();$('staffAttendanceBody').insertAdjacentHTML('beforeend',`<div class="staff-sheet-actions">${button('staffAttendanceRescan','Scan current QR again','secondary-btn')}</div>`);$('staffAttendanceRescan').onclick=()=>startCamera(request.action,request);}}}
     finally{if(current(lease)){submitBusy=false;if(confirm?.isConnected){confirm.disabled=confirm.dataset.qrExpired==='true';confirm.removeAttribute('aria-busy');}renderActions();}}
   }
@@ -235,7 +300,7 @@
     const lease=account(),refreshed=await refresh();if(!current(lease))return;
     if(!refreshed||!allowed(retained.action)||(retained.action!=='CHECK_IN'&&String(retained.attendance_id)!==String(activeId()))){sheetError('The original action no longer matches the active session. Check its receipt again; no different session will be changed.');return;}
     if(['CHECK_IN','CHECK_OUT'].includes(retained.action)&&today.qr_required!==false)return startCamera(retained.action,retained);
-    confirmAction(retained.action,null,{},retained);
+    await withAttendanceLocation(retained.action, sample => confirmAction(retained.action, null, {}, retained, sample));
   }
   async function reconcileView(){
     const previous=identity?account():null;if(!await verifyIdentity())return;if(previous&&!current(previous))return;
@@ -249,8 +314,8 @@
         const receipt=result.receipt;
         if(String(receipt.request_id)!==String(retained.request_id))throw new Error('The returned receipt does not match the pending request. Contact your supervisor before retrying.');
         clearPending();
-        if(retained.action==='CHECK_OUT')openCheckoutNote(receipt.attendance_id,receipt.attendance||{});
-        else{openSheet('Attendance confirmed',`<p>${escape(actionLabels[retained.action]||'Attendance')} was recorded. No repeat action was sent.</p><div class="staff-sheet-actions">${button('staffAttendanceConfirmedClose','Done')}</div>`);$('staffAttendanceConfirmedClose').onclick=close;}
+        if(retained.action==='CHECK_OUT')openCheckoutNote(receipt.attendance_id,receipt.attendance||{},receipt.attendance?.check_out_address);
+        else showAttendanceReceipt(`${actionLabels[retained.action] || 'Attendance'} was recorded. No repeat action was sent.`, retained.action === 'CHECK_IN' ? receipt.attendance?.check_in_address : null);
         await window.loadTimesheet?.();assertCurrent(lease);
       }else{
         const safeTarget=allowed(retained.action)&&(retained.action==='CHECK_IN'||String(retained.attendance_id)===String(activeId()));
@@ -262,10 +327,16 @@
     if(current(lease))renderActions();
   }
   function options(items,label){return `<option value="">${escape(label)}</option>`+(items||[]).map(item=>`<option value="${escape(typeof item==='object'?item.id:item)}">${escape(typeof item==='object'?item.title||item.name||item.label:item)}</option>`).join('');}
-  function openCheckoutNote(attendanceId,attendance){
-    if(!attendanceId){openSheet('Checkout recorded','<p>Your shift has ended. Open attendance history to add a summary.</p>');return;}
-    if(!window.VoxelCheckoutSummary){openSheet('Checkout saved','<p>The summary could not load. Your checkout remains saved. Refresh and open Edit summary in attendance history.</p>'+button('staffSummaryUnavailableClose','Close','secondary-btn'));$('staffSummaryUnavailableClose').onclick=close;return;}
-    window.VoxelCheckoutSummary.open({account,current,api,assertResult,openSheet,close,button,sheetError,refresh,isNote:()=>overlayKind==='note'},attendanceId,attendance);
+  const addressLine = address => address ? `<p class="staff-sheet-subtitle">Recorded location: ${escape(address)}</p>` : '';
+  function showAttendanceReceipt(message, address) {
+    openSheet('Attendance confirmed', `<p>${escape(message)}</p>${addressLine(address)}<div class="staff-sheet-actions">${button('staffAttendanceConfirmedClose', 'Done')}</div>`);
+    $('staffAttendanceConfirmedClose').onclick = close;
+  }
+  function openCheckoutNote(attendanceId,attendance,address){
+    const recordedLocation = addressLine(address);
+    if(!attendanceId){openSheet('Checkout recorded','<p>Your shift has ended. Open attendance history to add a summary.</p>'+recordedLocation);return;}
+    if(!window.VoxelCheckoutSummary){openSheet('Checkout saved','<p>The summary could not load. Your checkout remains saved. Refresh and open Edit summary in attendance history.</p>'+recordedLocation+button('staffSummaryUnavailableClose','Close','secondary-btn'));$('staffSummaryUnavailableClose').onclick=close;return;}
+    window.VoxelCheckoutSummary.open({account,current,api,assertResult,openSheet:(title,body,kind)=>openSheet(title,recordedLocation+body,kind),close,button,sheetError,refresh,isNote:()=>overlayKind==='note'},attendanceId,attendance);
   }
   async function openHistory(scope='own',pages={}){
     if(pages.from)historyFrom=pages.from;if(pages.to)historyTo=pages.to;if(pages.userId!==undefined)historyUserId=pages.userId?String(pages.userId):'';
@@ -359,7 +430,7 @@
     window.addEventListener('vv:avatar-auth-required',()=>boundary());
     window.addEventListener('vv:avatar-profile',event=>{const id=event.detail?.profile?.id;if(!Number.isSafeInteger(Number(id))||Number(id)<1)return;if(identity&&String(identity.id)!==String(id))boundary();else if(!identity&&!identityPromise&&!loading){clearTimeout(boundaryTimer);boundaryTimer=setTimeout(()=>{void refresh();},0);}});
     window.addEventListener('pagehide',()=>boundary({refreshAgain:false}));
-    window.addEventListener('pageshow',()=>{void refresh();void acceptCameraIntent();});window.addEventListener('focus',()=>{void refresh();});document.addEventListener('visibilitychange',()=>{stopClock();if(!document.hidden)void refresh();});window.addEventListener('online',()=>{stopClock();void refresh();});
+    window.addEventListener('pageshow',()=>{void refresh();void acceptCameraIntent();});window.addEventListener('focus',()=>{void refresh();});document.addEventListener('visibilitychange',()=>{stopClock();if(document.hidden)attendanceLocation=null;else void refresh();});window.addEventListener('online',()=>{stopClock();void refresh();});
   }
   const oldProfile=window.renderStaffProfile;if(typeof oldProfile==='function')window.renderStaffProfile=function(){void refresh();};
   window.refreshStaffSession=verifyIdentity;

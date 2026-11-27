@@ -153,6 +153,7 @@ test('QR host isolates the portal and requires a linked phone and explicit workp
   }
   assert.equal((await get('/qr-staff/approve.js', '', appHost)).status, 200);
   assert.equal((await get('/qr-staff/display.js')).status, 200);
+  assert.equal((await get('/qr-staff/attendance-location.js')).status, 200);
   assert.equal((await get('/qr-staff/site.css', '', appHost)).status, 200);
   const display = await get('/');
   assert.equal(display.status, 200);
@@ -238,6 +239,19 @@ test('QR host isolates the portal and requires a linked phone and explicit workp
   assert.equal(initial.staff_id, 17);
   assert.equal(initial.action, 'CHECK_IN');
   assert.equal(initial.tasks, undefined);
+  const previousLocationSetting = process.env.ATTENDANCE_LOCATION_REQUIRED;
+  try {
+    process.env.ATTENDANCE_LOCATION_REQUIRED = 'false';
+    assert.equal((await (await get('/qr-api/session', deviceJar)).json()).location_required, false);
+    assert.doesNotMatch((await get('/remote')).headers.get('permissions-policy'), /geolocation=\(self\)/);
+    process.env.ATTENDANCE_LOCATION_REQUIRED = 'true';
+    assert.equal((await (await get('/qr-api/session', deviceJar)).json()).location_required, true);
+    assert.match((await get('/remote')).headers.get('permissions-policy'), /geolocation=\(self\)/);
+    assert.doesNotMatch((await get('/')).headers.get('permissions-policy'), /geolocation=\(self\)/);
+  } finally {
+    if (previousLocationSetting === undefined) delete process.env.ATTENDANCE_LOCATION_REQUIRED;
+    else process.env.ATTENDANCE_LOCATION_REQUIRED = previousLocationSetting;
+  }
   assert.equal((await post('/qr-api/scan', { token: 'site-token', user_id: 298 }, deviceJar)).status, 400);
   const scan = await (await post('/qr-api/scan', { token: 'site-token' }, deviceJar)).json();
   assert.equal(scan.qr_proof, 'proof');

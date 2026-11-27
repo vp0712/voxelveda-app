@@ -13,7 +13,7 @@ const { bodyContract } = require('../middleware/requestContractMiddleware');
 
 router.get('/shift-qr', auth, attendanceController.shiftQrToken);
 const attend = requireAnyPermission('VIEW_ATTENDANCE');
-const actionFields = ['request_id','action','attendance_id','qr_proof','shift_qr_token','task_id','category_id','category','notes'];
+const actionFields = ['request_id','action','attendance_id','qr_proof','shift_qr_token','task_id','category_id','category','notes','location'];
 router.post('/qr/validate', auth, attend, bodyContract(['token','action','attendance_id'],{required:['token','action']}), attendanceController.validateQr);
 router.post('/actions', auth, attend, bodyContract(actionFields,{required:['request_id','action']}), attendanceController.action);
 router.get('/reconcile', auth, attend, attendanceController.reconcile);

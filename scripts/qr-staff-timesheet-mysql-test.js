@@ -18,14 +18,35 @@ if (process.env.REPAIR_DB_TEST !== 'true' || process.env.NODE_ENV !== 'test' ||
 const appHost = 'app.voxelveda.com';
 const qrHost = 'qr.voxelveda.com';
 const remote = process.argv.includes('--remote');
+const locate = process.argv.includes('--location');
+const fixtureGeocoder = 'https://attendance-geocoder.example.invalid/reverse';
+const checkInAddress = '100 Fixture Street';
+const checkOutAddress = '200 Fixture Street';
+let lookupCount = 0;
 Object.assign(process.env, {
   PUBLIC_APP_URL: 'https://' + appHost,
   ALLOWED_ORIGINS: 'https://' + appHost,
   QR_STAFF_ORIGIN: 'https://' + qrHost,
   QR_STAFF_EMIT: 'true',
+  ATTENDANCE_LOCATION_REQUIRED: String(locate),
+  ATTENDANCE_GEOCODER_URL: locate ? fixtureGeocoder : '',
+  ATTENDANCE_GEOCODER_TOKEN: '',
   JWT_SECRET: crypto.randomBytes(48).toString('hex'),
   SHIFT_QR_SIGNING_KEY: crypto.randomBytes(48).toString('hex')
 });
+if (locate) {
+  global.fetch = async (url, options) => {
+    assert.equal(String(url), fixtureGeocoder);
+    assert.equal(options.method, 'POST');
+    assert.equal(options.redirect, 'error');
+    const point = JSON.parse(options.body);
+    assert.deepEqual(Object.keys(point).sort(), ['latitude', 'longitude']);
+    assert.equal(point.latitude, 0);
+    assert([10, 20].includes(point.longitude));
+    lookupCount++;
+    return Response.json({ address: point.longitude === 10 ? checkInAddress : checkOutAddress });
+  };
+}
 
 const pool = require('../config/db');
 const app = require('../app');
@@ -106,9 +127,22 @@ async function main() {
       const scan = ok(await qrPost(source + 'scan', site, device));
       assert.equal(scan.action, expected);
       const body = { ...site, action: expected, attendance_id: scan.attendance_id, qr_proof: scan.qr_proof, request_id: crypto.randomUUID() };
+      if (locate) {
+        const denied = await qrPost(source + 'confirm', body, device);
+        assert.equal(denied.status, 422);
+        assert.equal(denied.data.code, 'ATTENDANCE_LOCATION_REQUIRED');
+        body.location = { latitude: 0, longitude: expected === 'CHECK_IN' ? 10 : 20, accuracy: 50, captured_at: new Date().toISOString() };
+      }
       const responses = await Promise.all([qrPost(source + 'confirm', body, device), qrPost(source + 'confirm', body, device)]);
       const receipt = ok(responses[0]).receipt;
       assert.deepEqual(ok(responses[1]).receipt, receipt);
+      if (locate) {
+        assert.equal(receipt.location_address, expected === 'CHECK_IN' ? checkInAddress : checkOutAddress);
+        const calls = lookupCount;
+        const { location, ...retry } = body;
+        assert.deepEqual(ok(await qrPost(source + 'confirm', retry, device)).receipt, receipt);
+        assert.equal(lookupCount, calls);
+      }
       const result = ok(await qrPost('reconcile', { request_id: body.request_id }, device));
       assert.equal(result.found, true);
       assert.deepEqual(result.receipt, receipt);
@@ -133,6 +167,17 @@ async function main() {
     const [[receipts]] = await pool.query('SELECT COUNT(*) AS count FROM attendance_action_receipts WHERE user_id=?', [id]);
     assert.equal(entries.count, 1);
     assert.equal(receipts.count, 2);
+    if (locate) {
+      const [locations] = await pool.query('SELECT action,address FROM attendance_punch_locations WHERE attendance_id=? AND user_id=? ORDER BY action', [first.attendance_id, id]);
+      assert.deepEqual(locations.map(row => [row.action, row.address]), [['CHECK_IN', checkInAddress], ['CHECK_OUT', checkOutAddress]]);
+      const own = ok(await request(port, appHost, '/api/attendance/today', portalCookie));
+      assert.equal(own.location_required, true);
+      const ownSession = own.sessions.find(row => Number(row.id) === first.attendance_id);
+      assert.equal(ownSession.check_in_address, checkInAddress);
+      assert.equal(ownSession.check_out_address, checkOutAddress);
+      assert.doesNotMatch(JSON.stringify(ownSession), /\"(?:latitude|longitude|accuracy|captured_at)\"/);
+      assert(lookupCount >= 2);
+    }
 
     ok(await request(port, appHost, '/attendance/phones/revoke-all', portalCookie, {}));
     assert.equal(ok(await request(port, qrHost, '/qr-api/session', device)).linked, false);

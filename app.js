@@ -38,6 +38,7 @@ app.use((req, res, next) => isQrStaffHost(req) ? next() : canonicalApplication(r
 app.use(enforceHttps);app.use(securityHeaders);app.use(safeApiResponses);
 // Dispatch the attendance hostname before portal CORS, cookies and public assets.
 const qrStaff = require('./routes/qrStaffSite');
+const { locationRequired } = require('./services/attendanceLocationService');
 app.use(qrStaff.host);
 const applicationCors=cors(corsOptions());
 app.use((req,res,next)=>req.method==='POST'&&req.path==='/api/security/csp-report'&&req.headers.origin==='null'?next():applicationCors(req,res,next));
@@ -57,6 +58,9 @@ function sendPage(filename,status=200){return(req,res)=>{
    const enabled = qrStaffOrigin() && hasPermission(req.user, 'VIEW_ATTENDANCE');
    html = html.replace('<!-- attendance-phone-settings -->', enabled
      ? '<a class="button button-secondary" href="/attendance/link-phone">Manage attendance phones</a>' : '');
+ }
+ if (filename === 'staff-dashboard.html' && locationRequired() && hasPermission(req.user, 'VIEW_ATTENDANCE')) {
+   res.set('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(self), payment=()');
  }
  return res.status(status).type('html').send(html);
 }}

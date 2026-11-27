@@ -3,6 +3,7 @@ const pool=require('../config/db');
 const {ensureAttendanceMobileSchema}=require('./attendanceMobileSchema');
 const attendanceTime=require('./attendanceTimeService');
 const qr=require('./attendanceQrService');
+const location=require('./attendanceLocationService');
 const p=require('./attendanceMobilePolicy');
 const {logAudit}=require('./auditService');
 const {hasAnyPermission}=require('./authorizationService');
@@ -33,21 +34,37 @@ async function resolveQr({user,input,remoteDeviceId=null,now=new Date()}){
 }
 async function performAction({user,input,req,now,requireSiteScan=false,phoneDeviceId=null,remoteQr=false}){
  const phoneAction=requireSiteScan||remoteQr;
- const auditSource=remoteQr?{qr_source:'PUBLIC_ATTENDANCE_QR'}:{};
  const userId=p.actor(user),requestId=p.requestId(input.request_id),action=String(input.action||'').toUpperCase();if(!ACTIONS.has(action))throw p.fail('Choose an explicit attendance action.','ATTENDANCE_ACTION_INVALID');
  const attendanceId=action==='CHECK_IN'?null:p.positiveId(input.attendance_id),notes=noteFields(input);
  if(action!=='CHECK_OUT'&&(notes.task_id||notes.category_id||notes.category||notes.notes))throw p.fail('Shift notes and task details belong to check-out.','ATTENDANCE_NOTE_ACTION_INVALID');
- const payloadHash=p.hash({action,attendance_id:attendanceId,...notes});await ensureAttendanceMobileSchema();const db=await pool.getConnection();let response;
+ const payloadHash=p.hash({action,attendance_id:attendanceId,...notes});
+ const needsLocation=location.locationRequired()&&(action==='CHECK_IN'||action==='CHECK_OUT');
+ const validateProof=at=>qr.validateActionProof({token:input.qr_proof||input.shift_qr_token,userId,action,attendanceId,remoteDeviceId:remoteQr?phoneDeviceId:null,now:at});
+ await ensureAttendanceMobileSchema();
+ let address=null;
+ if(needsLocation&&!await receipt(pool,userId,requestId)){
+  // Reject invalid QR proofs before sending coordinates. Recheck under the lock before writing.
+  const preflightNow=now||new Date();
+  try{
+   if(requireSiteScan)qr.validateSiteToken(input.site_token,preflightNow);
+   if(phoneAction||!await p.qrBypass(pool,userId))validateProof(preflightNow);
+   address=await location.resolveAddress(input.location,preflightNow);
+  }catch(error){if(!await receipt(pool,userId,requestId))throw error;}
+ }
+ const auditSource={...(remoteQr?{qr_source:'PUBLIC_ATTENDANCE_QR'}:{}),...(address?{location_recorded:true}:{})};
+ const db=await pool.getConnection();let response;
  try{
   await db.beginTransaction();const [[account]]=await db.query('SELECT id,active,deleted_at FROM users WHERE id=? FOR UPDATE',[userId]);if(!account||!Number(account.active)||account.deleted_at)throw p.fail('Your staff account is unavailable.','ATTENDANCE_ACCOUNT_UNAVAILABLE',403);
   if (phoneAction) await require('../services/qrPhoneService').authorizeAction(db, userId, phoneDeviceId);
   const prior=await receipt(db,userId,requestId);if(prior){if(prior.payload_sha256!==payloadHash)throw p.fail('This request ID was already used for another action.','ATTENDANCE_IDEMPOTENCY_CONFLICT',409);response={...p.parsed(prior.response_json),existing:true};await db.commit();return state(user,now).then(latest=>({...response,state:latest}));}
+  if(needsLocation&&!address)throw p.fail('Allow location access before recording attendance.','ATTENDANCE_LOCATION_REQUIRED',422);
   let actionNow=now;if(!actionNow){const [[clock]]=await db.query("SELECT DATE_FORMAT(UTC_TIMESTAMP(),'%Y-%m-%d %H:%i:%s') server_utc");const actual=p.instant(clock?.server_utc);if(!actual)throw p.fail('The authoritative server clock is unavailable.','ATTENDANCE_SERVER_TIME_INVALID',503);actionNow=actual.toJSDate();}
+  if(needsLocation)location.validateCapture(input.location,actionNow);
   const serverNow=p.utcNow(actionNow),sqlNow=attendanceTime.sqlUtc(serverNow),active=(await activeSessions(db,userId,true))[0]||null;
   if (requireSiteScan) qr.validateSiteToken(input.site_token, actionNow);
   const bypass = !phoneAction && await p.qrBypass(db, userId);
   let proof;
-  if(['CHECK_IN','CHECK_OUT'].includes(action)&&!bypass)proof=qr.validateActionProof({token:input.qr_proof||input.shift_qr_token,userId,action,attendanceId,remoteDeviceId:remoteQr?phoneDeviceId:null,now:actionNow});
+  if(['CHECK_IN','CHECK_OUT'].includes(action)&&!bypass)proof=validateProof(actionNow);
   let session,unchanged=false;
   if(action==='CHECK_IN'){
    if(active){session=active;unchanged=true;}
@@ -89,7 +106,10 @@ async function performAction({user,input,req,now,requireSiteScan=false,phoneDevi
    }
   }
   if(action==='CHECK_IN'&&!unchanged)await logAudit(db,{...p.auditMeta(user,req),action,recordId:session.id,newValue:{...p.publicAttendance(session),qr_bypass:bypass,...auditSource,request_id:requestId}});
-  response={request_id:requestId,action,attendance_id:Number(session.id),attendance:p.publicAttendance(session),unchanged,existing:false};
+  if(address&&!unchanged)await location.recordAddress(db,{attendanceId:session.id,userId,action,address});
+  const savedAddresses=needsLocation?(await location.addressesBySession(db,userId,[session.id])).get(Number(session.id)):null;
+  const savedAddress=savedAddresses?.[action==='CHECK_IN'?'check_in_address':'check_out_address'];
+  response={request_id:requestId,action,attendance_id:Number(session.id),attendance:{...p.publicAttendance(session),...savedAddresses},...(savedAddress?{location_address:savedAddress}:{}),unchanged,existing:false};
   await db.query('INSERT INTO attendance_action_receipts(user_id,request_id,action,attendance_id,payload_sha256,response_json) VALUES(?,?,?,?,?,?)',[userId,requestId,action,session.id,payloadHash,JSON.stringify(response)]);
   await db.commit();
  }catch(error){await db.rollback();throw error;}finally{db.release();}

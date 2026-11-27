@@ -21,6 +21,7 @@
   let identity;
   let request;
   let scan;
+  let locationSample = null;
   let busy = false;
 
   function bind(button, label, handle) {
@@ -88,8 +89,26 @@
     return [['Staff', info.staff_name], attendanceLocation(info, remote), ['Shift status', statuses[info.status] || info.status]];
   }
   const attendanceLocation = (info, isRemote) => isRemote ? ['Attendance', 'Remote'] : ['Workplace', info.site_name];
+  const locationRequired = () => identity?.location_required === true;
+  const freshLocation = () => window.VoxelAttendanceLocation?.isFresh(locationSample);
+  function locationPrompt(message) {
+    show('Location required', message || 'Share your current location to check in or check out. Your location is submitted when you confirm.', staffDetails(identity));
+    bind(primary, 'Share location', async () => { if (await collectLocation()) await preview(); });
+    if (request) bind(secondary, 'Check saved status', () => reconcile());
+  }
+  async function collectLocation() {
+    try {
+      if (!window.VoxelAttendanceLocation) throw new Error('Location is unavailable. Refresh the page and try again.');
+      locationSample = await window.VoxelAttendanceLocation.capture();
+      return true;
+    } catch (error) {
+      locationSample = null;
+      locationPrompt(error.message);
+      return false;
+    }
+  }
   function idle(note) {
-    scan = null;
+    scan = null; locationSample = null;
     if (remote) {
       show('Attendance unavailable', note || 'Refresh to check your current attendance status.', staffDetails(identity));
       bind(primary, 'Refresh attendance', start);
@@ -104,8 +123,8 @@
     if (!receipt.saved_at || !Number.isFinite(when.getTime())) throw new Error('Saved time unavailable.');
     const time = new Intl.DateTimeFormat('en-AU', { dateStyle: 'medium', timeStyle: 'medium', timeZone: receipt.timezone || identity.timezone || 'UTC' }).format(when);
     const place = attendanceLocation(identity, request.source === 'remote');
-    clearRequest(request); token = ''; scan = null;
-    show(name, 'Your attendance was saved.', [['Staff', identity.staff_name], place, ['Recorded at', time], ['Time zone', receipt.timezone || identity.timezone || 'UTC']]);
+    clearRequest(request); token = ''; scan = null; locationSample = null;
+    show(name, 'Your attendance was saved.', [['Staff', identity.staff_name], place, ['Recorded at', time], ['Time zone', receipt.timezone || identity.timezone || 'UTC'], ['Recorded location', receipt.location_address]]);
   }
   async function confirm() {
     if (!scan || !Object.hasOwn(actions, scan.action)) return;
@@ -113,6 +132,7 @@
     if (previous && (!request || previous.request_id !== request.request_id)) {
       request = previous; await reconcile(); return;
     }
+    if (locationRequired() && !freshLocation() && !await collectLocation()) return;
     const attempt = request || { request_id: crypto.randomUUID(), action: scan.action, attendance_id: scan.attendance_id, source: remote ? 'remote' : 'workplace' };
     localStorage.setItem(progressKey(), JSON.stringify(attempt));
     request = attempt;
@@ -121,6 +141,8 @@
       const { request_id, action, attendance_id } = attempt;
       const body = { request_id, action, attendance_id, qr_proof: scan.qr_proof };
       if (!remote) body.token = token;
+      if (locationRequired()) body.location = locationSample;
+      locationSample = null;
       const result = await api(remote ? 'remote/confirm' : 'confirm', body);
       showReceipt(result.receipt);
     } catch (error) {
@@ -151,6 +173,11 @@
     if (pendingRemote && !remote) bind(secondary, 'Open remote attendance', () => location.assign(remotePath));
   }
   async function preview() {
+    if (locationRequired() && !freshLocation()) {
+      scan = null;
+      locationPrompt();
+      return;
+    }
     let result;
     try { result = await api(remote ? 'remote/scan' : 'scan', remote ? {} : { token }); }
     catch (error) {
@@ -180,6 +207,7 @@
     bind(primary, actions[scan.action], confirm);
   }
   function askUnlink() {
+    locationSample = null;
     show('Unlink this phone?', 'You will need to verify your staff account again before recording attendance on this phone.', [['Staff', identity.staff_name]]);
     unlink.hidden = true;
     bind(primary, 'Unlink this phone', async () => {
@@ -189,7 +217,7 @@
   }
   function failure(error) {
     if (error.status === 401) {
-      identity = null; request = null; scan = null;
+      identity = null; request = null; scan = null; locationSample = null;
       show('Verify your phone', 'Your attendance session is no longer available. Link this phone to your active staff account.');
       bind(primary, 'Link this phone', beginLink);
       return;
@@ -228,7 +256,7 @@
     }
     identity = await api('session');
     if (!identity.linked) {
-      request = null; scan = null;
+      request = null; scan = null; locationSample = null;
       show('Link your phone', remote
         ? 'Verify your staff account in the Operations Hub to record attendance on this phone.'
         : 'Verify your staff account once in the Operations Hub, then scan the workplace QR to record attendance.');
@@ -240,6 +268,8 @@
     idle();
   }
   unlink.onclick = () => run(askUnlink);
+  window.addEventListener('pagehide', () => { locationSample = null; });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) locationSample = null; });
   window.addEventListener('pageshow', (event) => { if (event.persisted) run(start); });
   run(start);
 })();

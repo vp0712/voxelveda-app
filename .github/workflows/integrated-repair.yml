@@ -48,6 +48,7 @@ jobs:
         run: |
           node scripts/qr-staff-timesheet-mysql-test.js
           node scripts/qr-staff-timesheet-mysql-test.js --remote
+          node scripts/qr-staff-timesheet-mysql-test.js --remote --location
       - name: Verify durable release and private device alert isolation in MySQL
         run: node scripts/device-notices-mysql-test.js
       - name: Complete QMS registers, full authorised PDFs and targeted alerts in real MySQL

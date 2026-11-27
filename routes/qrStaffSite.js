@@ -14,6 +14,7 @@ const daily = require('../services/attendanceDailyService');
 const qr = require('../services/attendanceQrService');
 const { renderAttendanceQr } = require('../services/attendanceQrRenderer');
 const policy = require('../services/attendanceMobilePolicy');
+const { locationRequired } = require('../services/attendanceLocationService');
 
 const DEVICE = '__Host-vv_qr_staff';
 const VERIFIER = '__Host-vv_qr_link';
@@ -106,6 +107,7 @@ async function viewState(user) {
   const action = state.allowed_actions.find(v => v === 'CHECK_IN' || v === 'CHECK_OUT') || null;
   return {
     linked: true,
+    location_required: locationRequired(),
     staff_id: Number(user.id),
     staff_name: state.profile?.name || user.name || user.username || 'Staff',
     site_name: String(process.env.SHIFT_QR_SITE_LABEL || '').trim().slice(0, 120) || 'Workplace',
@@ -117,14 +119,18 @@ async function viewState(user) {
 function publicReceipt(receipt, timezone) {
   if (!receipt || !['CHECK_IN','CHECK_OUT'].includes(receipt.action)) return null;
   const stamp = receipt.action === 'CHECK_IN' ? receipt.attendance?.clock_in : receipt.attendance?.clock_out;
-  return { action: receipt.action, attendance_id: receipt.attendance_id, request_id: receipt.request_id, saved_at: stamp || null, timezone };
+  return { action: receipt.action, attendance_id: receipt.attendance_id, request_id: receipt.request_id, saved_at: stamp || null, timezone, ...(receipt.location_address ? { location_address: receipt.location_address } : {}) };
 }
 
 qrRoutes.use(privatePage, requireEnabled);
 qrRoutes.get('/', sendFile(path.join(viewsDir, 'display.html')));
-qrRoutes.get(['/a', '/setup', '/remote'], sendFile(path.join(viewsDir, 'index.html')));
+qrRoutes.get(['/a', '/setup', '/remote'], (_req, res, next) => {
+  if (locationRequired()) res.set('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(self), payment=()');
+  next();
+}, sendFile(path.join(viewsDir, 'index.html')));
 qrRoutes.get('/qr-staff/display.js', sendFile(path.join(viewsDir, 'display.js')));
 qrRoutes.get('/qr-staff/staff.js', sendFile(path.join(viewsDir, 'staff.js')));
+qrRoutes.get('/qr-staff/attendance-location.js', sendFile(path.join(__dirname, '..', 'public', 'attendance-location.js')));
 qrRoutes.get('/qr-staff/site.css', sendFile(path.join(viewsDir, 'site.css')));
 qrRoutes.get('/qr-staff/current', publicLimit, (_req, res) => {
   const now = Date.now();
@@ -196,14 +202,14 @@ const scanAction = remoteQr => asyncRoute(async (req, res) => {
 });
 qrRoutes.post('/qr-api/scan', linked, deviceLimit, bodyContract(['token'], { required: ['token'] }), scanAction(false));
 qrRoutes.post('/qr-api/remote/scan', linked, deviceLimit, emptyBody, scanAction(true));
-const confirmFields = ['action', 'attendance_id', 'qr_proof', 'request_id'];
+const confirmFields = ['action', 'attendance_id', 'qr_proof', 'request_id', 'location'];
 const requiredConfirmFields = ['action', 'qr_proof', 'request_id'];
 const confirmAction = remoteQr => asyncRoute(async (req, res) => {
-  const { token, action, attendance_id, qr_proof, request_id } = req.body;
+  const { token, action, attendance_id, qr_proof, request_id, location } = req.body;
   if (!['CHECK_IN','CHECK_OUT'].includes(action)) throw reject('Choose check in or check out.', 'ATTENDANCE_ACTION_INVALID', 422);
   const result = await actions.performAction({
     user: req.qrIdentity.user, req, requireSiteScan: !remoteQr, remoteQr, phoneDeviceId: req.qrIdentity.deviceId,
-    input: { site_token: token, action, attendance_id, qr_proof, request_id }
+    input: { site_token: token, action, attendance_id, qr_proof, request_id, ...(location === undefined ? {} : { location }) }
   });
   res.json({ receipt: publicReceipt(result, result.state.company_timezone) });
 });
