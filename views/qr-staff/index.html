@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="color-scheme" content="light dark">
+  <title>Staff attendance · Voxel Veda</title>
+  <link rel="icon" href="/logo.png">
+  <link rel="stylesheet" href="/qr-staff/site.css">
+  <script defer src="/qr-staff/staff.js"></script>
+</head>
+<body>
+  <main>
+    <header><img src="/logo.png" alt="Voxel Veda" width="64" height="64"><h1>Staff attendance</h1></header>
+    <div class="card" aria-labelledby="title">
+      <h2 id="title" tabindex="-1">Opening attendance…</h2>
+      <p id="message" role="status" aria-live="polite"></p>
+      <dl id="details" hidden></dl>
+      <div class="actions">
+        <button id="primary" type="button" hidden></button>
+        <button id="secondary" class="secondary" type="button" hidden></button>
+      </div>
+    </div>
+    <button id="unlink" class="text-button" type="button" hidden>Wrong person? Unlink this phone</button>
+    <noscript>Enable JavaScript on this phone to link it or confirm an attendance action.</noscript>
+  </main>
+</body>
+</html>

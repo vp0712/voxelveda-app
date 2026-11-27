@@ -32,8 +32,13 @@ const publicDir=path.join(__dirname,'public');
 const pageCache=new Map();
 const raw=(req,res,buffer)=>{req.rawBody=Buffer.from(buffer)};
 app.disable('x-powered-by');app.set('trust proxy',1);app.set('query parser','simple');
-app.use(require('./middleware/canonicalApplication').canonicalApplication);
+const { canonicalApplication } = require('./middleware/canonicalApplication');
+const { isQrStaffHost, qrStaffOrigin } = require('./config/qrStaffOrigin');
+app.use((req, res, next) => isQrStaffHost(req) ? next() : canonicalApplication(req, res, next));
 app.use(enforceHttps);app.use(securityHeaders);app.use(safeApiResponses);
+// Dispatch the attendance hostname before portal CORS, cookies and public assets.
+const qrStaff = require('./routes/qrStaffSite');
+app.use(qrStaff.host);
 const applicationCors=cors(corsOptions());
 app.use((req,res,next)=>req.method==='POST'&&req.path==='/api/security/csp-report'&&req.headers.origin==='null'?next():applicationCors(req,res,next));
 app.use('/api/auth',express.json({limit:'8kb',type:'application/json',verify:raw}));
@@ -41,12 +46,18 @@ app.use(express.json({limit:process.env.JSON_BODY_LIMIT||'1mb',type:['applicatio
 app.use(express.urlencoded({extended:false,limit:process.env.FORM_BODY_LIMIT||'1mb'}));
 app.post('/api/security/csp-report',rateLimitPolicy('csp_report'),securityTelemetry.recordCspViolation);
 app.use(csrfProtection);
+app.use(qrStaff.portal);
 app.get('/api/health',readiness.health);app.get('/api/ready',readiness.ready);
 app.get('/.well-known/assetlinks.json',require('./services/androidAssociationService').serveAssociation);
 function noIndex(req,res,next){res.set('X-Robots-Tag','noindex, nofollow, noarchive').set('Cache-Control','private, no-store');next()}
 function sendPage(filename,status=200){return(req,res)=>{
  const source=path.join(publicDir,filename);let html=pageCache.get(source);
  if(!html||process.env.NODE_ENV!=='production'){html=injectGlobalBrand(fs.readFileSync(source,'utf8'));if(process.env.NODE_ENV==='production')pageCache.set(source,html)}
+ if (filename === 'security.html') {
+   const enabled = qrStaffOrigin() && hasPermission(req.user, 'VIEW_ATTENDANCE');
+   html = html.replace('<!-- attendance-phone-settings -->', enabled
+     ? '<a class="button button-secondary" href="/attendance/link-phone">Manage attendance phones</a>' : '');
+ }
  return res.status(status).type('html').send(html);
 }}
 function redirect(target){return(req,res)=>{const index=req.originalUrl.indexOf('?');return res.redirect(302,target+(index>=0?req.originalUrl.slice(index):''));}}

@@ -116,6 +116,10 @@ PYSELECT
 )
 adb shell am instrument -w -r -e fixture_port "$VV_ANDROID_FIXTURE_PORT" -e class "$VV_ANDROID_OTHER_TESTS" com.voxelveda.app.test/androidx.test.runner.AndroidJUnitRunner | tee "$VV_ANDROID_PROOF_DIR/remaining-journeys.txt"
 if ! grep -Eq '^OK \([1-9][0-9]* tests?\)' "$VV_ANDROID_PROOF_DIR/remaining-journeys.txt"; then exit 1; fi
+# Other journeys reset WebView cookies. Establish the session to be preserved
+# on the original APK before installing the upgrade without clearing its data.
+adb shell am instrument -w -r -e fixture_port "$VV_ANDROID_FIXTURE_PORT" -e prepare_upgrade_only true -e class com.voxelveda.app.AndroidJourneyTest#installedJourney com.voxelveda.app.test/androidx.test.runner.AndroidJUnitRunner | tee "$VV_ANDROID_PROOF_DIR/prepare-upgrade-journey.txt"
+if ! grep -Eq '^OK \(1 test\)' "$VV_ANDROID_PROOF_DIR/prepare-upgrade-journey.txt"; then exit 1; fi
 adb shell am force-stop com.voxelveda.app
 ANDROID_VERSION_CODE=3 ANDROID_VERSION_NAME=0.0.0-upgrade-fixture android/gradlew -p android --no-daemon :app:assembleVerification
 node scripts/android-artifact-metadata.js android/app/build/outputs/apk/verification/app-verification.apk "$VV_ANDROID_PROOF_DIR/artifact-after-upgrade.json"

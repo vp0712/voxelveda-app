@@ -12,7 +12,7 @@ function collect(directory) {
     else if (entry.isFile() && entry.name.endsWith('.js')) files.push(relative);
   }
 }
-for (const directory of ['config', 'controllers', 'middleware', 'routes', 'services', 'utils', 'public', 'scripts']) collect(directory);
+for (const directory of ['config', 'controllers', 'middleware', 'routes', 'services', 'utils', 'public', 'views/qr-staff', 'scripts']) collect(directory);
 for (const file of [...new Set(files)].sort()) {
   const result = spawnSync(process.execPath, ['--check', path.join(root, file)], { encoding: 'utf8' });
   if (result.error || result.status !== 0) {

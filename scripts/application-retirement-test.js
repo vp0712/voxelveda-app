@@ -113,6 +113,8 @@ function applicationFixture() {
     './services/globalBrandRenderer': require('../services/globalBrandRenderer'),
     './middleware/canonicalApplication':require('../middleware/canonicalApplication'),
     './services/androidAssociationService':require('../services/androidAssociationService'),
+    './routes/qrStaffSite': {host: pass, portal: pass},
+    './config/qrStaffOrigin': require('../config/qrStaffOrigin'),
     './routes/attendanceDisplayRoutes': {display:express.Router(),management:express.Router(),privacy:(_req,_res,next)=>next(),page:(_req,res)=>res.send('display fixture')},
     './services/attendanceGateAccess': require('../services/attendanceGateAccess'),
     './config/urls': require('../config/urls'),

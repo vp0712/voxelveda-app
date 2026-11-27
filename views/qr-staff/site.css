@@ -1,0 +1,39 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f2f5fa;
+  --card: #fff;
+  --ink: #14243d;
+  --body: #43556b;
+  --rule: #c7d2df;
+  --accent: #174b86;
+  --btn-ink: white;
+  --focus: #a95000;
+  font: 100%/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101927; --card: #172539; --ink: #f2f5fa; --body: #c4cfdd;
+    --rule: #4a607b; --accent: #9bc8fc; --btn-ink: #122034; --focus: #ffbe68;
+  }
+}
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; color: var(--ink); background: var(--bg); }
+main { width: min(100%, 30rem); margin: 0 auto; padding: max(1.5rem, env(safe-area-inset-top)) 1rem max(2rem, env(safe-area-inset-bottom)); }
+header { display: flex; align-items: center; gap: 1rem; margin: .5rem 0 1.5rem; }
+header img { display: block; object-fit: contain; flex-shrink: 0; }
+h1 { margin: 0; font-size: 1.25rem; font-weight: 620; }
+h2 { margin: 0 0 .75rem; font-size: clamp(1.5rem, 5vw, 2rem); line-height: 1.16; }
+.card { background: var(--card); border: 1px solid var(--rule); border-radius: 1rem; padding: clamp(1rem, 4vw, 1.65rem); overflow-wrap: anywhere; }
+p { color: var(--body); margin: .5rem 0; }
+dl { margin: 1.25rem 0; }
+dl div { display: grid; grid-template-columns: minmax(5rem, 1fr) minmax(0, 1.65fr); gap: .6rem; padding: .65rem 0; border-bottom: 1px solid var(--rule); }
+dt { color: var(--body); } dd { margin: 0; font-weight: 600; }
+.actions { display: grid; gap: .65rem; }
+.actions:has(:not([hidden])) { margin-top: 1.3rem; }
+button, a.secondary { font: inherit; font-weight: 600; cursor: pointer; min-height: 48px; border: 1px solid transparent; border-radius: .55rem; padding: .65rem .9rem; text-align: center; }
+button { background: var(--accent); color: var(--btn-ink); }
+button:disabled { opacity: .65; cursor: wait; }
+.secondary { color: var(--accent); background: transparent; border-color: var(--rule); text-decoration: none; }
+.text-button { font-size: .95rem; font-weight: 500; color: var(--accent); background: transparent; display: block; margin: .45rem auto; text-decoration: underline; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }

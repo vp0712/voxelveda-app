@@ -69,7 +69,11 @@ public class AndroidJourneyTest {
  private void screenshot(String name)throws Exception{waitJs("[...document.images].every(image=>!image.getAttribute('src')||image.hidden||!image.getClientRects().length||(image.complete&&image.naturalWidth>0))&&!document.getElementById('vvGlobalBrandLoader')?.classList.contains('is-visible')");Thread.sleep(400);device.waitForIdle(1000);assertTrue(device.takeScreenshot(new File(evidence,name+".png")));}
  private void login(String email,String password)throws Exception{waitJs("document.getElementById('loginButton')?.disabled===false");js("document.getElementById('email').value="+JSONObject.quote(email)+";document.getElementById('password').value="+JSONObject.quote(password)+";document.getElementById('loginForm').requestSubmit();");}
  private FixtureTransport.Reply control(String route)throws Exception{return transport.relay(NavigationPolicy.ORIGIN+route,route.endsWith("expire")?"POST":"GET","",Collections.emptyMap());}
- private String proofVariant(){return InstrumentationRegistry.getArguments().getString("upgrade_only","false")+("true".equals(InstrumentationRegistry.getArguments().getString("restart_only"))?"-restart":"");}
+ private boolean preparingUpgrade(){return "true".equals(InstrumentationRegistry.getArguments().getString("prepare_upgrade_only"));}
+ private String proofVariant(){
+  if(preparingUpgrade())return "prepare-upgrade";
+  return InstrumentationRegistry.getArguments().getString("upgrade_only","false")+("true".equals(InstrumentationRegistry.getArguments().getString("restart_only"))?"-restart":"");
+ }
  private long externalViewCount(){String own=InstrumentationRegistry.getInstrumentation().getTargetContext().getPackageName();return Intents.getIntents().stream().filter(intent->Intent.ACTION_VIEW.equals(intent.getAction())&&!own.equals(intent.getPackage())&&(intent.getComponent()==null||!own.equals(intent.getComponent().getPackageName()))).count();}
  private void checkpoint(String stage)throws Exception{checkpoint(stage,"MainActivity");}
  private void checkpoint(String stage,String activity)throws Exception{
@@ -118,6 +122,12 @@ public class AndroidJourneyTest {
  }
 
  @Test public void installedJourney()throws Exception{
+  if(preparingUpgrade()){
+   staffSession();
+   CookieManager.getInstance().flush();
+   facts.add("Signed in on the original APK and flushed the fixture session before upgrade");
+   return;
+  }
   boolean upgrade="true".equals(InstrumentationRegistry.getArguments().getString("upgrade_only"));
   boolean restart="true".equals(InstrumentationRegistry.getArguments().getString("restart_only"));
   if(upgrade||restart){

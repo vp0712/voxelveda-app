@@ -13,6 +13,7 @@ const checks = [
   'android-canonical-test.js',
   'android-back-test.js',
   'attendance-live-regression-test.js',
+  'qr-staff-routes-test.js',
   'checkout-summary-test.js',
   'auth-lifecycle-test.js',
   'mfa-foundation-test.js',

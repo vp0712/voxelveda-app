@@ -32,3 +32,5 @@ try{
 }finally{
  for(const [name,value] of [['SHIFT_QR_SIGNING_KEY',previous.key],['SHIFT_QR_SITE_ID',previous.site]])if(value===undefined)delete process.env[name];else process.env[name]=value;
 }
+
+require('./qr-staff-origin-test');
