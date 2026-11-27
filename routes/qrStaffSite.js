@@ -23,7 +23,8 @@ const logoPath = path.join(__dirname, '..', 'public', 'logo.png');
 const emptyBody = bodyContract([], { allowEmpty: true });
 const qrRoutes = express.Router();
 const portal = express.Router();
-let displayQr;
+const DISPLAY_WINDOW_MS = 30_000;
+const displayImages = new Map();
 
 const deviceLimit = rateLimit({
   keyPrefix: 'qrstaff:user', max: 60, windowMs: 60000,
@@ -125,9 +126,34 @@ qrRoutes.get(['/a', '/setup', '/remote'], sendFile(path.join(viewsDir, 'index.ht
 qrRoutes.get('/qr-staff/display.js', sendFile(path.join(viewsDir, 'display.js')));
 qrRoutes.get('/qr-staff/staff.js', sendFile(path.join(viewsDir, 'staff.js')));
 qrRoutes.get('/qr-staff/site.css', sendFile(path.join(viewsDir, 'site.css')));
-qrRoutes.get('/qr-staff/attendance.png', asyncRoute(async (_req, res) => {
-  displayQr ??= (await renderAttendanceQr(new URL('/remote', qrStaffOrigin()).href, 16)).buffer;
-  res.type('png').send(displayQr);
+qrRoutes.get('/qr-staff/current', publicLimit, (_req, res) => {
+  const now = Date.now();
+  const slot = Math.floor(now / DISPLAY_WINDOW_MS);
+  res.json({
+    image_url: '/qr-staff/attendance.png?v=' + slot,
+    expires_at: new Date((slot + 1) * DISPLAY_WINDOW_MS).toISOString(),
+    server_time: new Date(now).toISOString()
+  });
+});
+qrRoutes.get('/qr-staff/attendance.png', publicLimit, asyncRoute(async (req, res) => {
+  const current = Math.floor(Date.now() / DISPLAY_WINDOW_MS);
+  const version = req.query.v;
+  if (version !== undefined && version !== String(current) && version !== String(current - 1)) return res.sendStatus(404);
+  const slot = version === undefined ? current : Number(version);
+  for (const key of displayImages.keys()) {
+    if (key !== current && key !== current - 1) displayImages.delete(key);
+  }
+  if (!displayImages.has(slot)) {
+    const target = new URL('/remote', qrStaffOrigin());
+    target.searchParams.set('v', String(slot));
+    const image = renderAttendanceQr(target.href, 16).catch(error => {
+      if (displayImages.get(slot) === image) displayImages.delete(slot);
+      throw error;
+    });
+    displayImages.set(slot, image);
+  }
+  const { buffer } = await displayImages.get(slot);
+  res.type('png').send(buffer);
 }));
 qrRoutes.get('/logo.png', sendFile(logoPath));
 qrRoutes.use('/qr-api', publicLimit);
