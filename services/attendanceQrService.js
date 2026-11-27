@@ -75,15 +75,17 @@ function createSiteToken(now=new Date()) {
 function validateSiteToken(token,now) {
   const claims=decode(token,now); if (claims.purpose !== 'ATTENDANCE_SITE' || claims.user_id !== null) throw error('Scan the workplace attendance QR code.','ATTENDANCE_QR_WRONG_PURPOSE'); return claims;
 }
-function createActionProof({userId,action,attendanceId=null,priorAttendanceId=null,siteToken,now=new Date()}) {
-  validateSiteToken(siteToken,now);
+function createActionProof({userId,action,attendanceId=null,priorAttendanceId=null,siteToken,remoteDeviceId=null,now=new Date()}) {
+  if (remoteDeviceId === null) validateSiteToken(siteToken,now);
   if (!['CHECK_IN','CHECK_OUT'].includes(action)) throw error('Choose check-in or check-out before scanning.','ATTENDANCE_QR_WRONG_PURPOSE',422);
   const current=Math.floor(now.getTime()/1000);
   const claims={v:1,purpose:action,site_id:siteId(),user_id:Number(userId),attendance_id:attendanceId,prior_attendance_id:priorAttendanceId,iat:current,exp:current+30,jti:crypto.randomUUID()};
+  if (remoteDeviceId !== null) claims.remote_device_id = remoteDeviceId;
   return {valid:true,action,attendance_id:attendanceId,qr_proof:encode(claims),expires_at:new Date(claims.exp*1000).toISOString(),site_id:claims.site_id,site_kind:'APPLICATION',server_time:now.toISOString()};
 }
-function validateActionProof({token,userId,action,attendanceId=null,now=new Date()}) {
+function validateActionProof({token,userId,action,attendanceId=null,remoteDeviceId=null,now=new Date()}) {
   const claims=decode(token,now);
+  if ((claims.remote_device_id ?? null) !== remoteDeviceId) throw error('Start this attendance action again on the same phone.','ATTENDANCE_QR_WRONG_DEVICE');
   if (claims.purpose !== action) throw error('This scanned proof is for a different action. Scan again after selecting your action.','ATTENDANCE_QR_WRONG_PURPOSE');
   if (Number(claims.user_id) !== Number(userId)) throw error('This scanned proof belongs to another staff account.','ATTENDANCE_QR_WRONG_USER');
   if (action === 'CHECK_OUT' && Number(claims.attendance_id) !== Number(attendanceId)) throw error('This scanned proof belongs to a different shift. Refresh and scan again.','ATTENDANCE_QR_WRONG_SESSION');

@@ -19,22 +19,35 @@ const summaryOptions=require('./checkoutSummaryService');
 function noteFields(input){return{task_id:input.task_id==null||input.task_id===''?null:p.positiveId(input.task_id,'task_id'),category:p.text(input.category,'category',120),notes:p.text(input.notes,'notes',10000),...(input.category_id==null||input.category_id===''?{}:{category_id:p.positiveId(input.category_id,'category_id')})};}
 async function receipt(db,userId,requestId){const [[row]]=await db.query('SELECT * FROM attendance_action_receipts WHERE user_id=? AND request_id=? LIMIT 1',[userId,requestId]);return row||null;}
 async function breakSummary(db,session,now){const [rows]=await db.query("SELECT *,DATE_FORMAT(started_at,'%Y-%m-%d %H:%i:%s') started_at_utc_text,DATE_FORMAT(ended_at,'%Y-%m-%d %H:%i:%s') ended_at_utc_text FROM attendance_break_intervals WHERE attendance_id=? AND user_id=? AND superseded_at IS NULL ORDER BY id FOR UPDATE",[session.id,session.user_id]);const open=rows.filter(row=>!row.ended_at);if(open.length>1)throw p.fail('Multiple unfinished breaks require an authorised correction.','ATTENDANCE_MULTIPLE_OPEN_BREAKS',409);let seconds=0;for(const row of rows){const start=p.instant(row.started_at_utc_text),end=row.ended_at?p.instant(row.ended_at_utc_text):now;if(!start||!end||end.toMillis()<start.toMillis())throw p.fail('Recorded break times need an authorised correction.','ATTENDANCE_BREAK_INVALID',409);seconds+=Math.floor((end.toMillis()-start.toMillis())/1000);}const base=Number(session.break_tracking_base_minutes??(rows.length?0:session.break_minutes??0));if(!Number.isSafeInteger(base)||base<0)throw p.fail('Recorded break minutes need an authorised correction.','ATTENDANCE_BREAK_INVALID',409);return{rows,open:open[0]||null,minutes:base+Math.floor(seconds/60)};}
-async function resolveQr({user,input,now=new Date()}){const userId=p.actor(user);await ensureAttendanceMobileSchema();const action=String(input.action||'').toUpperCase();if(!['CHECK_IN','CHECK_OUT'].includes(action))throw p.fail('Select check-in or check-out before scanning.','ATTENDANCE_ACTION_INVALID');qr.validateSiteToken(input.token,now);const active=(await activeSessions(pool,userId))[0]||null;if(action==='CHECK_IN'&&active)throw p.fail('You are already checked in. Refresh your attendance state.','ATTENDANCE_ALREADY_WORKING',409);const attendanceId=action==='CHECK_OUT'?p.positiveId(input.attendance_id):null;if(action==='CHECK_OUT'&&(!active||Number(active.id)!==attendanceId))throw p.fail('Refresh and select your exact active session before checking out.','ATTENDANCE_SESSION_CONFLICT',409);const latest=await latestSession(pool,userId);return qr.createActionProof({userId,action,attendanceId,priorAttendanceId:latest?.id||null,siteToken:input.token,now});}
-async function performAction({user,input,req,now,requireSiteScan=false,phoneDeviceId=null}){
+async function resolveQr({user,input,remoteDeviceId=null,now=new Date()}){
+ const userId=p.actor(user);await ensureAttendanceMobileSchema();
+ const action=String(input.action||'').toUpperCase();
+ if(!['CHECK_IN','CHECK_OUT'].includes(action))throw p.fail('Select check-in or check-out before scanning.','ATTENDANCE_ACTION_INVALID');
+ if(remoteDeviceId===null)qr.validateSiteToken(input.token,now);
+ const active=(await activeSessions(pool,userId))[0]||null;
+ if(action==='CHECK_IN'&&active)throw p.fail('You are already checked in. Refresh your attendance state.','ATTENDANCE_ALREADY_WORKING',409);
+ const attendanceId=action==='CHECK_OUT'?p.positiveId(input.attendance_id):null;
+ if(action==='CHECK_OUT'&&(!active||Number(active.id)!==attendanceId))throw p.fail('Refresh and select your exact active session before checking out.','ATTENDANCE_SESSION_CONFLICT',409);
+ const latest=await latestSession(pool,userId);
+ return qr.createActionProof({userId,action,attendanceId,priorAttendanceId:latest?.id||null,siteToken:input.token,remoteDeviceId,now});
+}
+async function performAction({user,input,req,now,requireSiteScan=false,phoneDeviceId=null,remoteQr=false}){
+ const phoneAction=requireSiteScan||remoteQr;
+ const auditSource=remoteQr?{qr_source:'PUBLIC_ATTENDANCE_QR'}:{};
  const userId=p.actor(user),requestId=p.requestId(input.request_id),action=String(input.action||'').toUpperCase();if(!ACTIONS.has(action))throw p.fail('Choose an explicit attendance action.','ATTENDANCE_ACTION_INVALID');
  const attendanceId=action==='CHECK_IN'?null:p.positiveId(input.attendance_id),notes=noteFields(input);
  if(action!=='CHECK_OUT'&&(notes.task_id||notes.category_id||notes.category||notes.notes))throw p.fail('Shift notes and task details belong to check-out.','ATTENDANCE_NOTE_ACTION_INVALID');
  const payloadHash=p.hash({action,attendance_id:attendanceId,...notes});await ensureAttendanceMobileSchema();const db=await pool.getConnection();let response;
  try{
   await db.beginTransaction();const [[account]]=await db.query('SELECT id,active,deleted_at FROM users WHERE id=? FOR UPDATE',[userId]);if(!account||!Number(account.active)||account.deleted_at)throw p.fail('Your staff account is unavailable.','ATTENDANCE_ACCOUNT_UNAVAILABLE',403);
-  if (requireSiteScan) await require('../services/qrPhoneService').authorizeAction(db, userId, phoneDeviceId);
+  if (phoneAction) await require('../services/qrPhoneService').authorizeAction(db, userId, phoneDeviceId);
   const prior=await receipt(db,userId,requestId);if(prior){if(prior.payload_sha256!==payloadHash)throw p.fail('This request ID was already used for another action.','ATTENDANCE_IDEMPOTENCY_CONFLICT',409);response={...p.parsed(prior.response_json),existing:true};await db.commit();return state(user,now).then(latest=>({...response,state:latest}));}
   let actionNow=now;if(!actionNow){const [[clock]]=await db.query("SELECT DATE_FORMAT(UTC_TIMESTAMP(),'%Y-%m-%d %H:%i:%s') server_utc");const actual=p.instant(clock?.server_utc);if(!actual)throw p.fail('The authoritative server clock is unavailable.','ATTENDANCE_SERVER_TIME_INVALID',503);actionNow=actual.toJSDate();}
   const serverNow=p.utcNow(actionNow),sqlNow=attendanceTime.sqlUtc(serverNow),active=(await activeSessions(db,userId,true))[0]||null;
   if (requireSiteScan) qr.validateSiteToken(input.site_token, actionNow);
-  const bypass = !requireSiteScan && await p.qrBypass(db, userId);
+  const bypass = !phoneAction && await p.qrBypass(db, userId);
   let proof;
-  if(['CHECK_IN','CHECK_OUT'].includes(action)&&!bypass)proof=qr.validateActionProof({token:input.qr_proof||input.shift_qr_token,userId,action,attendanceId,now:actionNow});
+  if(['CHECK_IN','CHECK_OUT'].includes(action)&&!bypass)proof=qr.validateActionProof({token:input.qr_proof||input.shift_qr_token,userId,action,attendanceId,remoteDeviceId:remoteQr?phoneDeviceId:null,now:actionNow});
   let session,unchanged=false;
   if(action==='CHECK_IN'){
    if(active){session=active;unchanged=true;}
@@ -72,10 +85,10 @@ async function performAction({user,input,req,now,requireSiteScan=false,phoneDevi
      await db.query(`UPDATE staff_attendance SET clock_out=?,clock_out_timestamp_basis='UTC',total_minutes=?,total_hours=?,break_minutes=?,checkout_task_id=?,checkout_category=?,notes=COALESCE(?,notes),attendance_status=?,review_required=?,review_reason=?,checkout_category_id=?,checkout_task_title=?,revision=revision+1 WHERE id=? AND clock_out IS NULL`,[sqlNow,minutes,hours,breaks.rows.length?breaks.minutes:session.break_minutes,validated.task_id,validated.category,notes.notes,review?'REVIEW_REQUIRED':'WORKED',review?1:0,reason,validated.category_id,validated.task_title,session.id]);
     }
     session=await loadSession(db,userId,session.id);
-    if(!unchanged)await logAudit(db,{...p.auditMeta(user,req),action,recordId:session.id,oldValue:p.publicAttendance(before),newValue:{...p.publicAttendance(session),qr_bypass:bypass,request_id:requestId}});
+    if(!unchanged)await logAudit(db,{...p.auditMeta(user,req),action,recordId:session.id,oldValue:p.publicAttendance(before),newValue:{...p.publicAttendance(session),qr_bypass:bypass,...auditSource,request_id:requestId}});
    }
   }
-  if(action==='CHECK_IN'&&!unchanged)await logAudit(db,{...p.auditMeta(user,req),action,recordId:session.id,newValue:{...p.publicAttendance(session),qr_bypass:bypass,request_id:requestId}});
+  if(action==='CHECK_IN'&&!unchanged)await logAudit(db,{...p.auditMeta(user,req),action,recordId:session.id,newValue:{...p.publicAttendance(session),qr_bypass:bypass,...auditSource,request_id:requestId}});
   response={request_id:requestId,action,attendance_id:Number(session.id),attendance:p.publicAttendance(session),unchanged,existing:false};
   await db.query('INSERT INTO attendance_action_receipts(user_id,request_id,action,attendance_id,payload_sha256,response_json) VALUES(?,?,?,?,?,?)',[userId,requestId,action,session.id,payloadHash,JSON.stringify(response)]);
   await db.commit();

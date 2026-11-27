@@ -12,6 +12,7 @@ const phone = require('../services/qrPhoneService');
 const actions = require('../services/attendanceActionService');
 const daily = require('../services/attendanceDailyService');
 const qr = require('../services/attendanceQrService');
+const { renderAttendanceQr } = require('../services/attendanceQrRenderer');
 const policy = require('../services/attendanceMobilePolicy');
 
 const DEVICE = '__Host-vv_qr_staff';
@@ -22,6 +23,7 @@ const logoPath = path.join(__dirname, '..', 'public', 'logo.png');
 const emptyBody = bodyContract([], { allowEmpty: true });
 const qrRoutes = express.Router();
 const portal = express.Router();
+let displayQr;
 
 const deviceLimit = rateLimit({
   keyPrefix: 'qrstaff:user', max: 60, windowMs: 60000,
@@ -118,9 +120,15 @@ function publicReceipt(receipt, timezone) {
 }
 
 qrRoutes.use(privatePage, requireEnabled);
-qrRoutes.get(['/', '/a'], sendFile(path.join(viewsDir, 'index.html')));
+qrRoutes.get('/', sendFile(path.join(viewsDir, 'display.html')));
+qrRoutes.get(['/a', '/setup', '/remote'], sendFile(path.join(viewsDir, 'index.html')));
+qrRoutes.get('/qr-staff/display.js', sendFile(path.join(viewsDir, 'display.js')));
 qrRoutes.get('/qr-staff/staff.js', sendFile(path.join(viewsDir, 'staff.js')));
 qrRoutes.get('/qr-staff/site.css', sendFile(path.join(viewsDir, 'site.css')));
+qrRoutes.get('/qr-staff/attendance.png', asyncRoute(async (_req, res) => {
+  displayQr ??= (await renderAttendanceQr(new URL('/remote', qrStaffOrigin()).href, 16)).buffer;
+  res.type('png').send(displayQr);
+}));
 qrRoutes.get('/logo.png', sendFile(logoPath));
 qrRoutes.use('/qr-api', publicLimit);
 qrRoutes.post('/qr-api/*', ownJson(qrStaffOrigin), express.json({ limit: '8kb', strict: true }));
@@ -151,25 +159,30 @@ qrRoutes.post('/qr-api/unlink', emptyBody, asyncRoute(async (req, res) => {
   res.clearCookie(VERIFIER, jar);
   res.json({ linked: false });
 }));
-qrRoutes.post('/qr-api/scan', linked, deviceLimit, bodyContract(['token'], { required: ['token'] }), asyncRoute(async (req, res) => {
+const scanAction = remoteQr => asyncRoute(async (req, res) => {
   const user = req.qrIdentity.user;
-  const site = qr.validateSiteToken(req.body.token);
+  const site = remoteQr ? null : qr.validateSiteToken(req.body.token);
   const snapshot = await viewState(user);
   if (!snapshot.action) throw reject('Your attendance requires review. Contact your supervisor.', 'ATTENDANCE_REVIEW_REQUIRED', 409);
-  const result = await actions.resolveQr({ user, input: { action: snapshot.action, attendance_id: snapshot.attendance_id, token: req.body.token } });
-  const expiry = Math.min(site.exp * 1000, Date.parse(result.expires_at));
+  const result = await actions.resolveQr({ user, input: { action: snapshot.action, attendance_id: snapshot.attendance_id, token: req.body.token }, remoteDeviceId: remoteQr ? req.qrIdentity.deviceId : null });
+  const expiry = Math.min(site ? site.exp * 1000 : Infinity, Date.parse(result.expires_at));
   res.json({ ...snapshot, qr_proof: result.qr_proof, expires_at: new Date(expiry).toISOString() });
-}));
-const confirmFields = ['token', 'action', 'attendance_id', 'qr_proof', 'request_id'];
-qrRoutes.post('/qr-api/confirm', linked, deviceLimit, bodyContract(confirmFields, { required: ['token', 'action', 'qr_proof', 'request_id'] }), asyncRoute(async (req, res) => {
+});
+qrRoutes.post('/qr-api/scan', linked, deviceLimit, bodyContract(['token'], { required: ['token'] }), scanAction(false));
+qrRoutes.post('/qr-api/remote/scan', linked, deviceLimit, emptyBody, scanAction(true));
+const confirmFields = ['action', 'attendance_id', 'qr_proof', 'request_id'];
+const requiredConfirmFields = ['action', 'qr_proof', 'request_id'];
+const confirmAction = remoteQr => asyncRoute(async (req, res) => {
   const { token, action, attendance_id, qr_proof, request_id } = req.body;
   if (!['CHECK_IN','CHECK_OUT'].includes(action)) throw reject('Choose check in or check out.', 'ATTENDANCE_ACTION_INVALID', 422);
   const result = await actions.performAction({
-    user: req.qrIdentity.user, req, requireSiteScan: true, phoneDeviceId: req.qrIdentity.deviceId,
+    user: req.qrIdentity.user, req, requireSiteScan: !remoteQr, remoteQr, phoneDeviceId: req.qrIdentity.deviceId,
     input: { site_token: token, action, attendance_id, qr_proof, request_id }
   });
   res.json({ receipt: publicReceipt(result, result.state.company_timezone) });
-}));
+});
+qrRoutes.post('/qr-api/confirm', linked, deviceLimit, bodyContract(['token', ...confirmFields], { required: ['token', ...requiredConfirmFields] }), confirmAction(false));
+qrRoutes.post('/qr-api/remote/confirm', linked, deviceLimit, bodyContract(confirmFields, { required: requiredConfirmFields }), confirmAction(true));
 qrRoutes.post('/qr-api/reconcile', linked, deviceLimit, bodyContract(['request_id'], { required: ['request_id'] }), asyncRoute(async (req, res) => {
   const requestId = policy.requestId(req.body.request_id);
   const result = await actions.reconcileAction({ user: req.qrIdentity.user, requestId });
@@ -202,7 +215,7 @@ portal.get('/attendance/link-phone', portalOnly, privatePage, requireEnabled, pa
 portal.post('/attendance/link-phone', portalOnly, privatePage, requireEnabled, appPost, enrolLimit, auth, ownSession,
   bodyContract(['challenge'], { required: ['challenge'] }), asyncRoute(async (req, res) => {
     const { code } = await phone.issueHandoff({ userId: req.user.id, challenge: req.body.challenge });
-    const callback = new URL('/', qrStaffOrigin());
+    const callback = new URL('/setup', qrStaffOrigin());
     callback.hash = new URLSearchParams({ code }).toString();
     res.json({ url: callback.href });
   }), failure);

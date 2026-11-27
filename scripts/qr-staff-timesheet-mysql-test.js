@@ -17,6 +17,7 @@ if (process.env.REPAIR_DB_TEST !== 'true' || process.env.NODE_ENV !== 'test' ||
 }
 const appHost = 'app.voxelveda.com';
 const qrHost = 'qr.voxelveda.com';
+const remote = process.argv.includes('--remote');
 Object.assign(process.env, {
   PUBLIC_APP_URL: 'https://' + appHost,
   ALLOWED_ORIGINS: 'https://' + appHost,
@@ -96,14 +97,16 @@ async function main() {
     assert.equal(ok(await request(port, qrHost, '/qr-api/session', device)).staff_id, id);
 
     async function punch(expected) {
-      const code = new URL(qr.createSiteToken().qr_data);
+      const code = new URL(remote ? '/remote' : qr.createSiteToken().qr_data, 'https://' + qrHost);
       assert.equal(code.hostname, qrHost);
       assert.equal((await request(port, qrHost, code.pathname + code.search, device)).status, 200);
       const token = code.searchParams.get('t');
-      const scan = ok(await qrPost('scan', { token }, device));
+      const source = remote ? 'remote/' : '';
+      const site = remote ? {} : { token };
+      const scan = ok(await qrPost(source + 'scan', site, device));
       assert.equal(scan.action, expected);
-      const body = { token, action: expected, attendance_id: scan.attendance_id, qr_proof: scan.qr_proof, request_id: crypto.randomUUID() };
-      const responses = await Promise.all([qrPost('confirm', body, device), qrPost('confirm', body, device)]);
+      const body = { ...site, action: expected, attendance_id: scan.attendance_id, qr_proof: scan.qr_proof, request_id: crypto.randomUUID() };
+      const responses = await Promise.all([qrPost(source + 'confirm', body, device), qrPost(source + 'confirm', body, device)]);
       const receipt = ok(responses[0]).receipt;
       assert.deepEqual(ok(responses[1]).receipt, receipt);
       const result = ok(await qrPost('reconcile', { request_id: body.request_id }, device));
@@ -133,7 +136,8 @@ async function main() {
 
     ok(await request(port, appHost, '/attendance/phones/revoke-all', portalCookie, {}));
     assert.equal(ok(await request(port, qrHost, '/qr-api/session', device)).linked, false);
-    assert.equal((await qrPost('scan', { token: qr.createSiteToken().token }, device)).status, 401);
+    const revoked = remote ? await qrPost('remote/scan', {}, device) : await qrPost('scan', { token: qr.createSiteToken().token }, device);
+    assert.equal(revoked.status, 401);
     console.log('PASS real HTTP phone linking, two confirmed actions, concurrent retries, receipt reconciliation, weekly verified minutes and revocation.');
   } finally {
     await new Promise(resolve => server.close(resolve));

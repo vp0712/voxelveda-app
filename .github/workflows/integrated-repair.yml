@@ -45,7 +45,9 @@ jobs:
       - name: Disposable MySQL original schema, record preservation, PDF grants and atomic email claims
         run: node scripts/retained-mysql-test.js
       - name: Verify QR phone check-in, retries and weekly timesheets through HTTP
-        run: node scripts/qr-staff-timesheet-mysql-test.js
+        run: |
+          node scripts/qr-staff-timesheet-mysql-test.js
+          node scripts/qr-staff-timesheet-mysql-test.js --remote
       - name: Verify durable release and private device alert isolation in MySQL
         run: node scripts/device-notices-mysql-test.js
       - name: Complete QMS registers, full authorised PDFs and targeted alerts in real MySQL

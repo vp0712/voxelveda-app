@@ -46,6 +46,16 @@ function testStaffOrigin() {
     assert.equal(new URL(service.createSiteToken(at).qr_data).origin, urls.app);
     assert.equal(service.validateSiteToken(scan.href, at).site_id, 'fixture-qr-staff-a');
     assert.equal(service.validateSiteToken(oldScan.qr_data, at).site_id, 'fixture-qr-staff-a');
+
+    const remoteDeviceId = crypto.randomUUID();
+    const action = { userId: 123, action: 'CHECK_IN', now: at };
+    const remoteProof = service.createActionProof({ ...action, remoteDeviceId }).qr_proof;
+    const workplaceProof = service.createActionProof({ ...action, siteToken: token }).qr_proof;
+    assert.equal(service.validateActionProof({ ...action, token: remoteProof, remoteDeviceId }).user_id, 123);
+    assert.throws(() => service.validateActionProof({ ...action, token: remoteProof }), { code: 'ATTENDANCE_QR_WRONG_DEVICE' });
+    assert.throws(() => service.validateActionProof({ ...action, token: workplaceProof, remoteDeviceId }), { code: 'ATTENDANCE_QR_WRONG_DEVICE' });
+    assert.throws(() => service.validateActionProof({ ...action, token: remoteProof, remoteDeviceId: crypto.randomUUID() }), { code: 'ATTENDANCE_QR_WRONG_DEVICE' });
+    assert.throws(() => service.validateSiteToken(remoteProof, at), { code: 'ATTENDANCE_QR_WRONG_PURPOSE' });
   } finally {
     for (const [key, value] of previous) {
       if (value === undefined) delete process.env[key];
