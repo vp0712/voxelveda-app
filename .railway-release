@@ -1,9 +1,9 @@
-application-release: 20261123-mobile-entry-and-device-notices
-candidate-commit: 5228214e3f350e1eee056d24be7d0df463b8de5c
-merged-commit: 932d9a7ad855ec4b2a2ba9a8a3db0ba75e7630a4
+application-release: 20261127-qr-staff-attendance-pilot
+candidate-commit: 39564270fd0a4a668739f84134782e88f4b77d22
+merged-commit: e48626dd5fc1beebe185a1f981515570dc667c8d
 production-branch: main
-previous-live-commit: 75ee8ffc0b46077a2a9de488d566ca8f0bc0f0ab
-scope: mobile sign-in, dashboard surroundings and profile; fixed 96-hour ordinary sessions; privileged 2-hour assurance; permission-scoped AI Team activity; consent-based device notices
+previous-live-commit: 0789e82898a84ae6b7d946e9c79a9a1ed8b370f4
+scope: staff phone linking and explicit rotating QR check-in and checkout connected to the existing attendance records and weekly timesheet
 preserved: unchanged-original-logo-ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312; navy-light-dark-theme; existing-records-IDs-attachments-audit-encryption-keys-security-domain-and-startup-guards
 notifications: single-focused-responsive-centre; authorised-unread-count-and-specific-record-links; durable-per-recipient-read-state-and-event-version-deduplication; retained-original-invoice-expense-events; retired-links-blocked; mixed-schema-collations-compatible; profile-preferences-only
 avatars: one-authenticated-byte-and-Blob-renderer; genuine-image-decode-EXIF-orientation-square-crop-size-pixel-scan-validation; private-S3-first-or-retained-database-storage; audited-references; immediate-refresh-and-account-isolation; settled-failure-cache-and-controlled-retry
@@ -14,16 +14,16 @@ mobile: 44px-icon-targets-wrapping-toolbars; retained-accessible-names-contextua
 weekly-delivery: worked-shifts-only; explicit-REGISTERED_EMAIL-policy-v2-using-users.email; no-designated-address-fallback; exactly-one-To-no-CC-no-BCC-or-manager-copy; current-account-and-source-rechecked; durable-staff-week-revision-idempotency; historical-accepted-recipients-preserved
 weekly-schedule: retained-Monday-0700-Australia-Sydney-default-and-configured-Australian-IANA-timezone; bounded-latest-completed-week; no-zero-hour-email-or-historical-backfill
 pdf-delivery: retained-immutable-source-and-parser-validated-PDF-bytes-hash-version; at-least-one-valid-page-and-identity; application-pdf-safe-pdf-filename-and-disposition; non-PDF-and-error-downloads-rejected; uncertain-provider-outcomes-held-for-review
-ci: 480 JavaScript syntax checks; 102 regression scripts; UTC and production-style Melbourne builds; real MySQL fresh/upgrade/concurrency and complete folder/history preservation; 33 layout cases and 22 checks per company-folder browser run; 3 local Chromium passes and 5 local WebKit 27.2 passes using isolated host libraries; full 205-row folder PDF and email snapshot; original sidebar/chart/logo preservation; installed-emulator evidence, with store and physical-device verification recorded separately
-ci-candidate-release-run: 45197189185:application; 45197189325:installed Android; 45197189012:iOS build; 45197189270:sidebar and charts; 45197189156:MySQL; 45197188996:security; 45197189371:consolidation
-ci-merged-release-run: 45281320128:application; 45281320193:installed Android; 45281320137:iOS build; 45281320222:sidebar and charts; 45281320275:MySQL; 45281320159:security; 45281320359:consolidation
+ci: 509 syntax checks, 106 application regression scripts, mobile Chromium QR workflow, disposable MySQL HTTP-to-timesheet proof, installed Android upgrade and preservation checks
+ci-candidate-release-run: 45994511558:Android installed application verification:success; 45994511562:Application Release Candidate CI:success; 45994511669:Current sidebar, charts and internal content:success; 45994511568:Final System Consolidation:success; 45994511548:Global Original Logo Branding:success; 45994511650:Original Application MySQL Regression:success; 45994511551:Security CI:success
+ci-merged-release-run: 45997406212:Android installed application verification:success; 45997406118:Application Release Candidate CI:success; 45997406107:Current sidebar, charts and internal content:success; 45997406184:Enterprise Audit Evidence:success; 45997406220:Final System Consolidation:success; 45997406224:Global Original Logo Branding:success; 45997406590:Original Application MySQL Regression:success; 45997406155:Security CI:success
 failed-release-attempt: a886e793e9247fa5406a2d71e83d38a8376a682b-Railway-4f7e2ee5-2378-430f-bc41-665b38b152eb; build-fixture-mocked-unconfigured-scanner; repaired-clean-scanner-fixture-and-required-production-CI; production-upload-security-unchanged
 failed-private-storage-attempt: 618f0cd79796a2458d7065347a7bedcb6acc1da3-Railway-65dbe8f2-76e2-42b3-a06e-51da11bdbc1c; legacy-database-fixture-inherited-selected-private-provider; scoped-environment-restoration-and-explicit-unavailable-storage-rejection-verified; production-private-storage-guard-unchanged
 browser-evidence: populated-75-invoice-backend-paging-null-vs-zero-full-filtered-totals-errors-retry-edit-revision-and-payment-receipt-reconciliation; 16-invoice-and-16-staff-width-theme-cases-plus-14-procurement-cases; 80-public-account-layout-cases; real-local-PDFjs-renderer-and-exact-parser-validated-PDF-download; retained-RFQ-edit-history-archive-restore-import-private-source-report-workflows; actual-branded-QR-decoder-rotations-outage-reconnect-and-240-mandatory-samples
-verification-limits: Real push on a physical device, production push credentials and signed native store distribution remain pending. App Links were verified publicly. The release adds device-notice settings without enabling transport or altering timesheet email.
+verification-limits: The physical-phone workplace pilot and live staff timesheet verification are pending. Keep workplace QR emission on the app hostname.
 configuration: same-Railway-service-domain-database-and-private-storage; explicit-Resend-HTTPS-company-and-document-transport; authorised-info-at-voxelveda-dot-com-sender; no-subscription-billing-DNS-or-signing-change; unchanged-three-predeploy-guards
 relay-status: Resend-HTML-queue158-and-PDF-queue159-provider-accepted-once; earlier-WordPress-implementation-not-changed-or-attributed-as-TMP-root-cause; historical-and-uncertain-queue-outcomes-preserved; recipient-receipt-and-received-MIME-remain-unverified
-rollback: Previous healthy source 75ee8ffc0b46077a2a9de488d566ca8f0bc0f0ab and Railway deployment 9167c97c-6cb3-466d-82d0-fcc06436cfac. Preserve session, notice and historical attendance records.
+rollback: Previous healthy source 0789e82898a84ae6b7d946e9c79a9a1ed8b370f4 and Railway deployment 2abec925-69f7-4ee5-a7e8-c8953b036e66. Preserve staff attendance records and the additive phone-link schema.
 qr-gate: 104-byte-canonical-HTTPS-url; VVATT2-full-SHA256-HMAC-site-binding-and-existing-bounded-expiration; original-logo-embedded-in-every-integer-module-H-QR; four-module-quiet-zone; load-complete-before-swap; server-clock-expiry-and-stale-code-hide; 12-hour-site-bound-display-only-HttpOnly-kiosk-cookie; authenticated-EDIT_ATTENDANCE-issuance
 camera-entry: protected-GET-safe-login-return; authenticated-POST-token-and-current-clock-state-revalidation; explicit-confirmation-and-durable-request-id-required; never-public-GET-attendance
 public-entry: Log-in-and-Sign-up-only-plus-Privacy-Terms; unchanged-viewer-customer-signup-and-administrator-employee-invitation; no-public-role-grant
@@ -193,3 +193,7 @@ mobile-device-notices-20261123-source: PR346. The gated PR tree and merged-main 
 mobile-device-notices-20261123-preservation: Sidebar, logo, chart behaviour, attendance, timesheets, invoice folders and existing production infrastructure were preserved.
 mobile-device-notices-20261123-verification: 105 regression scripts in UTC and Australia/Melbourne, real MySQL, independently verified Android emulator journeys, unsigned iOS simulator build and sidebar/chart preservation. Signed producer lifecycle verified in isolation.
 mobile-device-notices-20261123-activation: Keep production device delivery disabled until the required credentials and provider-specific tests are complete. Firebase confirmation, existing Android signing, store release permissions, physical testing and production producer secrets are tracked in docs/DEVICE_NOTICES.md and docs/NATIVE_RELEASE_SETUP.md.
+
+qr-staff-attendance-pilot-source: PR347 and docs/QR-STAFF-ATTENDANCE.md. The gated PR and merged-main trees match. The release commit changes only this marker.
+qr-staff-attendance-pilot-configuration: QR_STAFF_ORIGIN=https://qr.voxelveda.com and QR_STAFF_EMIT=false on the existing Railway production service. The public HTTPS certificate was independently verified.
+qr-staff-attendance-pilot-activation: Link an authorised test phone, use fresh workplace codes on the QR hostname for both punches and confirm both times on a single row in the existing timesheet before switching workplace emission.
