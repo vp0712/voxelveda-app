@@ -48,13 +48,14 @@ jobs:
         run: |
           node scripts/qr-staff-timesheet-mysql-test.js
           node scripts/qr-staff-timesheet-mysql-test.js --remote
-          node scripts/qr-staff-timesheet-mysql-test.js --remote --location
       - name: Verify durable release and private device alert isolation in MySQL
         run: node scripts/device-notices-mysql-test.js
       - name: Complete QMS registers, full authorised PDFs and targeted alerts in real MySQL
         env:
           QMS_PROOF_DIR: ${{ runner.temp }}/qms-register-proof
         run: node scripts/qms-register-mysql-test.js
+      - name: Verify required punch locations and address receipts with a mocked resolver
+        run: node scripts/qr-staff-timesheet-mysql-test.js --remote --location
       - name: Preserve complete register and PDF evidence
         if: always()
         uses: actions/upload-artifact@v4
