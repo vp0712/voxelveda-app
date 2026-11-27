@@ -69,6 +69,7 @@
 .staff-attendance-sheet .staff-home-feedback{color:var(--danger)}
 .staff-attendance-sheet .staff-sheet-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
 .staff-sheet-actions>button{min-height:48px;border-radius:10px;flex:1}
+.staff-sheet-actions>.staff-attendance-browser-link{display:inline-flex;align-items:center;justify-content:center;min-height:48px;border-radius:10px;flex:1;text-decoration:none}
 .staff-attendance-sheet :is(input,select,textarea){display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box;min-height:46px;background:var(--surface);color:var(--text-primary);border:1px solid var(--control-border);border-radius:9px;padding:10px 12px;font:inherit}
 .checkout-option-group{min-width:0}
 .checkout-option-search{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0}
